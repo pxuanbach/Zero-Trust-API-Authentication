@@ -195,26 +195,48 @@ Mặc dù có nhiều theoretical frameworks và individual implementations, v�
 │  │    Route    │    │ Application │    │   Private   │     │
 │  │     53      │───▶│    Load     │───▶│   Subnets   │     │
 │  │             │    │  Balancer   │    │ (Multi-AZ)  │     │
-│  └─────────────┘    └─────────────┘    └─────────────┘     │
+│  └─────────────┘    └─────────────┘    └─────┬───────┘     │
 │                                               │             │
 │  ┌─────────────┐    ┌─────────────┐    ┌─────▼─────┐       │
-│  │  CloudFront │    │     WAF     │    │    EC2    │       │
-│  │ (Optional)  │    │  (Optional) │    │ Instances │       │
-│  └─────────────┘    └─────────────┘    │ (Proxy)   │       │
+│  │   AWS KMS   │    │   Secrets   │    │    EC2    │       │
+│  │ Certificates)│    │             │    │ (Proxy)   │       │
+│  └─────────────┘    └─────────────┘    └───┬───────┘       │
+│                                               │             │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────▼─────┐       │
+│  │ CloudWatch  │    │   RDS       │    │  Backend  │       │
+│  │ (Monitoring)│    │(PostgreSQL) │    │ Services  │       │
+│  └─────────────┘    └─────────────┘    │ (Multi-AZ)│       │
+│                                        └───┬───────┘       │
+│                                               │             │
+│                                        ┌─────▼─────┐       │
+│                                        │ElastiCache│       │
+│                                        │  (Redis)  │       │
 │                                        └───────────┘       │
-│                                               │             │
-│  ┌─────────────┐    ┌─────────────┐    ┌─────▼─────┐       │
-│  │   AWS KMS   │    │   Secrets   │    │  Backend  │       │
-│  │  (Keys &    │    │  Manager    │    │ Services  │       │
-│  │ Certificates)│    │             │    │ (Multi-AZ)│       │
-│  └─────────────┘    └─────────────┘    └───────────┘       │
-│                                               │             │
-│  ┌─────────────┐    ┌─────────────┐    ┌─────▼─────┐       │
-│  │ CloudWatch  │    │   RDS       │    │ElastiCache│       │
-│  │ (Monitoring)│    │(PostgreSQL) │    │  (Redis)  │       │
-│  └─────────────┘    └─────────────┘    └───────────┘       │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+**Giải thích chi tiết từng tầng:**
+
+**Tầng DNS & Load Balancing:**
+- **Route 53**: Cung cấp DNS resolution và health checking, hỗ trợ geographical routing và failover capabilities
+- **Application Load Balancer**: Layer 7 load balancer với SSL/TLS termination, health checking, và traffic distribution across multiple AZs
+
+**Tầng Compute & Proxy:**
+- **EC2 Instances (Private Subnets)**: Chạy mTLS proxy gateway trong private subnets để tăng cường security, chỉ nhận traffic từ ALB
+- **Multi-AZ Deployment**: Đảm bảo high availability với instances phân bố trong ít nhất 2 Availability Zones
+
+**Tầng Security & Key Management:**
+- **AWS KMS**: Quản lý encryption keys cho certificates và tokens, cung cấp hardware security modules (HSMs) và audit trails
+- **AWS Secrets Manager**: Lưu trữ an toàn private keys, database credentials, và API keys với automatic rotation
+
+**Tầng Backend Services:**
+- **Backend Services (Multi-AZ)**: Business logic services được triển khai trong private subnets với load balancing và auto scaling
+- **RDS PostgreSQL**: Managed relational database với automatic backups, point-in-time recovery, và read replicas
+- **ElastiCache Redis**: In-memory cache cho session data, token validation results, và certificate validation cache
+
+**Tầng Monitoring & Logging:**
+- **CloudWatch**: Comprehensive monitoring với metrics, logs, và alarms cho performance và security events
+- **X-Ray (implied)**: Distributed tracing để theo dõi request flow qua các services
 
 #### Luồng xác thực chi tiết
 
@@ -247,6 +269,93 @@ Mặc dù có nhiều theoretical frameworks và individual implementations, v�
       │ 9. Response           │                       │
       │◀──────────────────────┤                       │
 ```
+
+**Giải thích chi tiết từng bước:**
+
+**Bước 1-2: mTLS Handshake & Certificate Validation**
+- Client khởi tạo TLS connection và gửi client certificate (X.509) chứa public key
+- Proxy thực hiện certificate validation theo chuỗi:
+  ```
+  Certificate Chain Validation:
+  ├── Certificate signature verification (sử dụng CA public key)
+  ├── Certificate expiry check (notBefore/notAfter timestamps)
+  ├── Revocation status check (CRL/OCSP query)
+  ├── Certificate policies và key usage validation
+  └── Subject Alternative Name (SAN) verification
+  ```
+- Nếu validation thành công, secure TLS channel được thiết lập với Perfect Forward Secrecy
+
+**Bước 3: HTTP Request với Dual Authentication Headers**
+Client gửi HTTP request với hai authentication mechanisms:
+```
+Authorization: DPoP <access_token>
+DPoP: <dpop_proof_jwt>
+
+Trong đó:
+- access_token: JWT với cnf (confirmation) claim liên kết đến client certificate
+- dpop_proof_jwt: JWT proof ký bằng private key tương ứng với certificate
+```
+
+**Bước 4: Access Token Validation**
+Proxy thực hiện comprehensive token validation:
+```
+Token Validation Process:
+├── JWT signature verification (sử dụng issuer's public key)
+├── Token expiry check (exp claim)
+├── Audience validation (aud claim)
+├── Issuer verification (iss claim)
+├── Not-before check (nbf claim)
+└── Confirmation claim extraction (cnf claim)
+```
+
+**Bước 5: DPoP Proof Verification**
+Proxy validation DPoP proof JWT:
+```
+DPoP Proof Validation:
+├── JWT signature verification (sử dụng client's public key từ certificate)
+├── HTTP method matching (htm claim)
+├── Target URL matching (htu claim)
+├── Timestamp freshness check (iat claim, typically <60 seconds)
+├── Unique identifier verification (jti claim - prevent replay)
+└── Public key confirmation (jwk claim matches certificate)
+```
+
+**Bước 6: Certificate-Token Binding Verification**
+Critical security step - xác minh cryptographic binding:
+```
+Binding Verification Process:
+├── Extract public key từ client certificate
+├── Extract confirmation claim (cnf) từ access token
+├── Compare certificate thumbprint với cnf.x5t#S256
+├── Verify DPoP proof signature matches certificate private key
+└── Ensure temporal consistency (all components have valid timestamps)
+```
+
+**Bước 7-8: Backend Service Communication**
+- Nếu tất cả validations pass, proxy forwards request đến backend service
+- Request được enrich với verified identity information và security context
+- Backend service xử lý business logic và trả về response
+
+**Bước 9: Response Delivery**
+- Proxy nhận response từ backend và thực hiện final security checks
+- Audit log được ghi nhận với đầy đủ security context
+- Response được gửi về client qua established mTLS channel
+
+**Security Checkpoints Summary:**
+```
+Multi-layered Validation:
+├── Layer 1: mTLS Certificate Authentication (Transport)
+├── Layer 2: Bearer Token Authorization (Application)  
+├── Layer 3: DPoP Proof-of-Possession (Cryptographic Binding)
+├── Layer 4: Certificate-Token Binding Verification (Anti-theft)
+└── Layer 5: Replay Prevention (Temporal + Nonce validation)
+```
+
+**Failure Handling:**
+- Mỗi validation step failure dẫn đến immediate request rejection
+- Comprehensive error logging cho security monitoring
+- Rate limiting và anomaly detection cho suspicious patterns
+- Automatic certificate revocation triggering nếu compromise detected
 
 #### Các thành phần chính
 
