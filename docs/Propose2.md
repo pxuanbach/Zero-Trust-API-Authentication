@@ -108,19 +108,19 @@ Với sự gia tăng của sophisticated attacks và compliance requirements (PC
 
 #### Academic Research
 
-Lĩnh vực bảo mật API đã có nhiều tiến bộ quan trọng thông qua các tiêu chuẩn OAuth 2.0 và các extension của nó. RFC 7800 [1] đã giới thiệu khái niệm Proof-of-Possession Key Semantics cho JSON Web Tokens, tạo nền tảng cho việc binding tokens với cryptographic keys. Tiếp theo đó, RFC 9449 [2] chính thức hóa OAuth 2.0 Demonstrating Proof-of-Possession (DPoP) protocol, cho phép clients chứng minh sở hữu private key thông qua dynamic proof generation. Đồng thời, RFC 8705 [3] đã chuẩn hóa OAuth 2.0 Mutual-TLS Client Authentication và Certificate-Bound Access Tokens, tạo ra framework hoàn chỉnh cho strong client authentication.
+Lĩnh vực bảo mật API đã có nhiều tiến bộ quan trọng thông qua các tiêu chuẩn OAuth 2.0 và các phần mở rộng (extensions) của nó. RFC 7800 [1] đã giới thiệu khái niệm Ngữ nghĩa Khóa Chứng minh Sở hữu (Proof-of-Possession Key Semantics) cho JSON Web Tokens, tạo nền tảng cho việc ràng buộc tokens với khóa mật mã. Tiếp theo đó, RFC 9449 [2] chính thức hóa giao thức OAuth 2.0 Demonstrating Proof-of-Possession (DPoP) protocol, cho phép clients chứng minh sở hữu private key thông qua việc tạo bằng chứng động. Đồng thời, RFC 8705 [3] đã chuẩn hóa OAuth 2.0 Mutual-TLS Client Authentication và Certificate-Bound Access Tokens, tạo ra khung làm việc hoàn chỉnh cho xác thực clients mạnh.
 
-Về mặt kiến trúc Zero-Trust, NIST SP 800-207 [4] đã đưa ra định nghĩa chính thức và nguyên tắc triển khai Zero Trust Architecture vào năm 2020. Google đã tiên phong trong việc triển khai practical zero-trust model thông qua BeyondCorp initiative [5], chứng minh khả năng áp dụng "never trust, always verify" principle trong môi trường enterprise quy mô lớn. Microsoft đã mở rộng ý tưởng này với Zero Trust Security Model [6], cung cấp comprehensive framework bao gồm identity verification, device compliance, và application protection.
+Về mặt kiến trúc Zero-Trust, NIST SP 800-207 [4] đã đưa ra định nghĩa chính thức và nguyên tắc triển khai Zero Trust Architecture vào năm 2020. Google đã tiên phong trong việc triển khai practical zero-trust model thông qua BeyondCorp initiative [5], chứng minh khả năng áp dụng "never trust, always verify" principle trong môi trường enterprise quy mô lớn. Microsoft đã mở rộng ý tưởng này với Zero Trust Security Model [6], cung cấp khung làm việc toàn diện bao gồm xác minh danh tính (identity verification), tuân thủ thiết bị (device compliance), và bảo vệ ứng dụng (application protection).
 
 #### Industry Implementations
 
-Ngành tài chính đã dẫn đầu trong việc áp dụng enhanced API security. Payment Services Directive 2 (PSD2) [7] của European Union đã mandated strong customer authentication cho payment services, tạo động lực cho việc phát triển Financial-grade API (FAPI) security profile [8]. FAPI Working Group tại OpenID Foundation đã phát triển comprehensive security requirements sử dụng mTLS và signed JWTs, được nhiều ngân hàng lớn như Barclays, HSBC, và Deutsche Bank áp dụng [9]. SWIFT đã cập nhật Customer Security Programme (CSP) requirements [10] để bao gồm secure messaging với certificate-based authentication.
+Ngành tài chính đã dẫn đầu trong việc áp dụng bảo mật API nâng cao. Payment Services Directive 2 (PSD2) [7] của Liên minh Châu Âu đã quy định bắt buộc xác thực clients mạnh cho cho dịch vụ thanh toán, tạo động lực cho việc phát triển hồ sơ bảo mật API cấp độ Tài chính (Financial-grade API - FAPI) [8]. Nhóm Làm việc FAPI tại OpenID Foundation đã phát triển các yêu cầu bảo mật toàn diện sử dụng mTLS và signed JWTs, được nhiều ngân hàng lớn như Barclays, HSBC, và Deutsche Bank áp dụng [9]. SWIFT đã cập nhật các yêu cầu Chương trình Bảo mật Khách hàng (CSP) [10] để bao gồm nhắn tin an toàn với xác thực dựa trên chứng chỉ (certificate-based authentication).
 
-Các công ty công nghệ lớn đã triển khai various approaches cho service-to-service authentication. Google đã phát triển Istio service mesh [11] với automatic mTLS between services, hiện được sử dụng rộng rãi trong Kubernetes environments. Netflix đã mở mã nguồn Zuul gateway [12] với support cho certificate-based authentication, xử lý hàng triệu requests mỗi ngày. Uber đã publish case study [13] về internal service authentication sử dụng mTLS, báo cáo 99.9% reduction trong security incidents. Spotify đã share implementation [14] của OAuth 2.0 PKCE với certificate binding cho mobile applications.
+Các công ty công nghệ lớn đã triển khai nhiều phương pháp khác nhau cho xác thực giữa các dịch vụ. Google đã phát triển Istio service mesh [11] với mTLS tự động giữa các services, hiện được sử dụng rộng rãi trong Kubernetes environments. Netflix đã mở mã nguồn Zuul gateway [12] với hỗ trợ cho xác thực dựa trên chứng chỉ, xử lý hàng triệu requests mỗi ngày. Uber đã công bố nghiên cứu điển hình [13] về xác thực dịch vụ nội bộ sử dụng mTLS, báo cáo giảm 99.9% trong sự cố bảo mật. Spotify đã chia sẻ triển khai [14] của OAuth 2.0 PKCE với ràng buộc chứng chỉ cho mobile applications cho ứng dụng di động.
 
 #### Existing Solutions Analysis
 
-Các solution hiện tại đều có trade-offs riêng biệt. Kong Gateway [15] cung cấp rich plugin ecosystem với mTLS support, nhưng thiếu native support cho advanced PoP mechanisms và yêu cầu complex configuration. Istio Service Mesh [16] automatic mTLS và policy enforcement hiệu quả, nhưng bị giới hạn trong Kubernetes environment và có steep learning curve. AWS API Gateway [17] là managed service dễ setup, nhưng limited customization options và tạo vendor lock-in. Envoy Proxy [18] cung cấp high performance và extensibility tốt, nhưng yêu cầu deep expertise để configure properly.
+Các giải pháp hiện tại đều có sự đánh đổi riêng biệt. Kong Gateway [15] cung cấp hệ sinh thái plugin phong phú với hỗ trợ mTLS, nhưng thiếu native support cho cơ chế PoP nâng cao và yêu cầu cấu hình phức tạp. Istio Service Mesh [16] mTLS tự động và thực thi chính sách hiệu quả, nhưng bị giới hạn trong môi trường Kubernetes và có đường cong học tập dốc. AWS API Gateway [17] là dịch vụ được quản lý dễ cài đặt, nhưng tùy chọn tùy chỉnh bị hạn chế và tạo ra sự phụ thuộc vào nhà cung cấp. Envoy Proxy [18] cung cấp hiệu suất cao và khả năng mở rộng tốt, nhưng yêu cầu chuyên môn sâu để cấu hình đúng cách.
 
 #### Research Gap
 
@@ -480,12 +480,12 @@ Một phần quan trọng của evaluation là so sánh hiệu suất các thu�
 Algorithm Performance Matrix (trên t3a.micro/small):
 
                  ECDSA P-256    RSA-2048      Ed25519
-Certificate Gen    80ms         350ms         15ms
-Cert Validation    5ms          1.2ms         0.5ms  
-Token Signing      8ms          25ms          1.5ms
-Token Verify       12ms         1.2ms         1ms
-Memory Usage       Low          High          Lowest
-CPU Usage         Medium        High          Low
+Certificate Gen    ?ms          ?ms           ?ms
+Cert Validation    ?ms          ?ms           ?ms  
+Token Signing      ?ms          ?ms           ?ms
+Token Verify       ?ms          ?ms           ?ms
+Memory Usage       ?            ?             ?
+CPU Usage          ?            ?             ?
 Key Size          256-bit       2048-bit      255-bit
 Security Level    ~128-bit      ~112-bit      ~128-bit
 
@@ -552,9 +552,9 @@ Nghiên cứu này đề xuất một kiến trúc Zero-Trust API authentication
 - Balance giữa security và performance
 
 **Về mặt vận hành:**
-- Simplified PKI management thông qua cloud services
-- Automated certificate lifecycle management
-- Reduced operational overhead và human errors
+- Quản lý PKI dễ dàng thông qua cloud services
+- Quản lý certificate lifecycle tự động
+- Làm giảm operational overhead và human errors
 
 ### Nghiên cứu tương lai:
 
