@@ -2,10 +2,6 @@
 
 ```mermaid
 graph LR
-    subgraph "Internet"
-        DNS[Route 53<br/>DNS Resolution]
-    end
-    
     subgraph "Load Balancing"
         ALB[Application Load Balancer<br/>SSL/TLS Termination]
     end
@@ -36,7 +32,6 @@ graph LR
         CW[CloudWatch<br/>Monitoring & Logs]
     end
     
-    DNS --> ALB
     ALB --> P1
     ALB --> P2
     
@@ -65,7 +60,7 @@ graph LR
     classDef data fill:#3F48CC,stroke:#232F3E,stroke-width:2px,color:#fff
     classDef security fill:#DD344C,stroke:#232F3E,stroke-width:2px,color:#fff
     
-    class DNS,ALB aws
+    class ALB aws
     class P1,P2,B1,B2 compute
     class RDS,REDIS data
     class KMS,SM,CW security

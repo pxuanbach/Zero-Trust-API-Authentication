@@ -192,52 +192,41 @@ Mặc dù có nhiều theoretical frameworks và individual implementations, v�
 │                        AWS Cloud                             │
 │                                                             │
 │  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐     │
-│  │    Route    │    │ Application │    │   Private   │     │
-│  │     53      │───▶│    Load     │───▶│   Subnets   │     │
-│  │             │    │  Balancer   │    │ (Multi-AZ)  │     │
-│  └─────────────┘    └─────────────┘    └─────┬───────┘     │
-│                                               │             │
-│  ┌─────────────┐    ┌─────────────┐    ┌─────▼─────┐       │
-│  │   AWS KMS   │    │   Secrets   │    │    EC2    │       │
-│  │  (Keys &    │    │  Manager    │    │ Instances │       │
-│  │ Certificates)│    │             │    │ (Proxy)   │       │
-│  └─────────────┘    └─────────────┘    └───┬───────┘       │
-│                                               │             │
-│  ┌─────────────┐    ┌─────────────┐    ┌─────▼─────┐       │
-│  │ CloudWatch  │    │   RDS       │    │  Backend  │       │
-│  │ (Monitoring)│    │(PostgreSQL) │    │ Services  │       │
-│  └─────────────┘    └─────────────┘    │ (Multi-AZ)│       │
-│                                        └───┬───────┘       │
-│                                               │             │
-│                                        ┌─────▼─────┐       │
-│                                        │ElastiCache│       │
-│                                        │  (Redis)  │       │
-│                                        └───────────┘       │
+│  │ Application │───▶│   Private   │    │   AWS KMS   │     │
+│  │    Load     │    │   Subnets   │    │  (Keys &    │     │
+│  │  Balancer   │    │ (Multi-AZ)  │    │Certificates)│     │
+│  └─────────────┘    └─────┬───────┘    └─────────────┘     │
+│                           │                                 │
+│  ┌─────────────┐    ┌─────▼─────┐    ┌─────────────┐       │
+│  │   Secrets   │    │    EC2    │    │ CloudWatch  │       │
+│  │  Manager    │    │ Instances │    │(Monitoring) │       │
+│  │             │    │ (Proxy)   │    │             │       │
+│  └─────────────┘    └───┬───────┘    └─────────────┘       │
+│                         │                                  │
+│  ┌─────────────┐    ┌───▼───────┐    ┌─────────────┐       │
+│  │     RDS     │    │  Backend  │    │ElastiCache  │       │
+│  │(PostgreSQL) │    │ Services  │    │  (Redis)    │       │
+│  │             │    │(Multi-AZ) │    │             │       │
+│  └─────────────┘    └───────────┘    └─────────────┘       │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 **Giải thích chi tiết từng tầng:**
 
-**Tầng DNS & Load Balancing:**
-- **Route 53**: Cung cấp DNS resolution và health checking, hỗ trợ geographical routing và failover capabilities
-- **Application Load Balancer**: Layer 7 load balancer với SSL/TLS termination, health checking, và traffic distribution across multiple AZs
+**Tầng Load Balancing:**
+Application Load Balancer đóng vai trò là điểm vào chính của hệ thống, thực hiện (1) chấm dứt kết nối SSL/TLS từ phía client; (2) kiểm tra tình trạng sức khỏe của các proxy instances; và (3) phân phối lưu lượng truy cập đều khắp nhiều vùng khả dụng để đảm bảo tính sẵn sàng cao.
 
 **Tầng Compute & Proxy:**
-- **EC2 Instances (Private Subnets)**: Chạy mTLS proxy gateway trong private subnets để tăng cường security, chỉ nhận traffic từ ALB
-- **Multi-AZ Deployment**: Đảm bảo high availability với instances phân bố trong ít nhất 2 Availability Zones
+Các EC2 instances được triển khai trong mạng con riêng tư trên nhiều vùng khả dụng, chạy cổng proxy mTLS được phát triển bằng FastAPI với các thư viện (1) cryptography cho xử lý chứng chỉ X.509; (2) PyJWT cho xác thực token; và (3) httpx cho reverse proxy đến các dịch vụ backend. Kiến trúc đa vùng này đảm bảo khả năng chịu lỗi cao và chỉ nhận lưu lượng từ ALB để tăng cường bảo mật.
 
 **Tầng Security & Key Management:**
-- **AWS KMS**: Quản lý encryption keys cho certificates và tokens, cung cấp hardware security modules (HSMs) và audit trails
-- **AWS Secrets Manager**: Lưu trữ an toàn private keys, database credentials, và API keys với automatic rotation
+AWS KMS đảm nhận việc quản lý khóa mã hóa cho chứng chỉ và token thông qua các mô-đun bảo mật phần cứng (HSMs) và cung cấp nhật ký kiểm toán đầy đủ. Secrets Manager lưu trữ an toàn (1) khóa riêng tư của chứng chỉ; (2) thông tin xác thực cơ sở dữ liệu; và (3) khóa API với khả năng tự động xoay vòng để giảm thiểu rủi ro bảo mật.
 
-**Tầng Backend Services:**
-- **Backend Services (Multi-AZ)**: Business logic services được triển khai trong private subnets với load balancing và auto scaling
-- **RDS PostgreSQL**: Managed relational database với automatic backups, point-in-time recovery, và read replicas
-- **ElastiCache Redis**: In-memory cache cho session data, token validation results, và certificate validation cache
+**Tầng Backend:**
+Các dịch vụ logic nghiệp vụ được triển khai trên FastAPI trong mạng con riêng tư với cơ chế cân bằng tải và tự động mở rộng. RDS PostgreSQL hoạt động như cơ sở dữ liệu quan hệ được quản lý với (1) sao lưu tự động; (2) khôi phục đến thời điểm cụ thể; và (3) bản sao đọc để tăng hiệu suất. ElastiCache Redis cung cấp bộ nhớ đệm trong bộ nhớ cho (1) dữ liệu phiên làm việc; (2) kết quả xác thực token; và (3) bộ nhớ đệm xác thực chứng chỉ nhằm giảm độ trễ.
 
 **Tầng Monitoring & Logging:**
-- **CloudWatch**: Comprehensive monitoring với metrics, logs, và alarms cho performance và security events
-- **X-Ray (implied)**: Distributed tracing để theo dõi request flow qua các services
+CloudWatch thực hiện giám sát toàn diện với các chỉ số, nhật ký và cảnh báo cho các sự kiện hiệu suất và bảo mật. X-Ray hỗ trợ theo dõi phân tán để truy vết luồng yêu cầu qua các dịch vụ, giúp phát hiện và khắc phục sự cố nhanh chóng.
 
 #### Luồng xác thực chi tiết
 
@@ -271,7 +260,7 @@ Mặc dù có nhiều theoretical frameworks và individual implementations, v�
       │◀──────────────────────┤                       │
 ```
 
-**Giải thích chi tiết từng bước:**
+**Cụ thể:**
 
 **Bước 1-2: mTLS Handshake & Certificate Validation**
 - Client khởi tạo TLS connection và gửi client certificate (X.509) chứa public key
@@ -358,32 +347,16 @@ Multi-layered Validation:
 - Rate limiting và anomaly detection cho suspicious patterns
 - Automatic certificate revocation triggering nếu compromise detected
 
-#### Các thành phần chính
+#### Techstack
 
-**1. Certificate Authority (CA) Service:**
-- Root CA và Intermediate CA setup
-- Multi-algorithm certificate generation (ECDSA P-256, RSA-2048, Ed25519)
-- Certificate lifecycle management
-- Revocation checking (CRL/OCSP)
+**Proxy mTLS (FastAPI):**
+Thành phần cốt lõi được phát triển bằng Python FastAPI với các thư viện chuyên biệt gồm (1) cryptography để xử lý chứng chỉ X.509 và các phép toán mật mã; (2) PyJWT cho việc tạo và xác minh JSON Web Tokens; (3) httpx làm HTTP client bất đồng bộ cho reverse proxy; (4) uvicorn làm máy chủ ASGI hiệu suất cao; và (5) pydantic để validation dữ liệu đầu vào. Middleware tùy chỉnh xử lý (1) trích xuất chứng chỉ client từ TLS handshake; (2) xác thực chuỗi chứng chỉ; (3) kiểm tra tình trạng thu hồi qua CRL/OCSP; và (4) thực hiện liên kết mật mã giữa chứng chỉ và token.
 
-**2. mTLS Proxy Gateway:**
-- TLS termination với client certificate validation
-- DPoP token verification
-- Certificate-token binding validation
-- Request routing và load balancing
-- Performance monitoring và logging
+**Dịch vụ xác thực:**
+Được xây dựng trên FastAPI với Redis làm session store, sử dụng thư viện python-jose để tạo JWT với các claim xác nhận (cnf) liên kết đến dấu vân tay chứng chỉ client. Hỗ trợ nhiều thuật toán ký gồm (1) ECDSA P-256 cho hiệu suất cao; (2) RSA-2048 cho tương thích rộng rãi; và (3) Ed25519 cho bảo mật tối ưu và tốc độ nhanh.
 
-**3. Authentication Service:**
-- JWT token issuance với confirmation (cnf) claims
-- DPoP proof validation
-- Multi-algorithm signing support
-- Token binding management
-
-**4. Backend Services:**
-- Business logic implementation
-- Database integration
-- Audit logging
-- Performance metrics collection
+**Các thành phần hỗ trợ:**
+Agent cấp chứng chỉ (CA) được thiết lập bằng OpenSSL hoặc CFSSL để tạo Root CA và Intermediate CA với khả năng tạo chứng chỉ đa thuật toán. Quản lý vòng đời chứng chỉ được tự động hóa thông qua scripts Python tích hợp với AWS Secrets Manager. Các dịch vụ backend được phát triển trên FastAPI với SQLAlchemy ORM cho PostgreSQL và redis-py để tương tác với ElastiCache.
 
 ### 3.2 Analysis of Proposed Architecture
 
