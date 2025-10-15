@@ -36,9 +36,9 @@
 
 ## 1. Introduction
 
-Trong bối cảnh bảo mật hiện đại, các tổ chức ngày càng chuyển sang mô hình Zero-Trust để bảo vệ tài sản kỹ thuật số. Đặc biệt, với sự bùng nổ của microservices và API-driven architecture, việc xác thực và ủy quyền API trở thành một thách thức quan trọng. Các phương pháp xác thực truyền thống như Bearer tokens có nhiều hạn chế về bảo mật, đặc biệt là khả năng bị đánh cắp token và tấn công replay.
+Trong bối cảnh bảo mật hiện đại, các tổ chức ngày càng chuyển sang mô hình Zero-Trust để bảo vệ tài sản kỹ thuật số. Đặc biệt, với sự bùng nổ của microservices và kiến trúc điều khiển bằng API, việc xác thực và ủy quyền API trở thành một thách thức quan trọng. Các phương pháp xác thực truyền thống như token mang (Bearer) có nhiều hạn chế về bảo mật, đặc biệt là khả năng bị đánh cắp token và tấn công phát lại (replay).
 
-Nghiên cứu này đề xuất một kiến trúc Zero-Trust API authentication kết hợp mutual TLS (mTLS) với token-based signatures, cụ thể là Proof of Possession (PoP) tokens, nhằm tạo ra một hệ thống xác thực đa lớp có khả năng chống lại các cuộc tấn công token theft và replay attack. Kiến trúc được thiết kế để triển khai trên môi trường cloud AWS với focus vào việc so sánh hiệu suất của các thuật toán mã hóa khác nhau.
+Nghiên cứu này đề xuất một kiến trúc xác thực API Zero-Trust kết hợp TLS tương hỗ (mTLS) với chữ ký dựa trên token, cụ thể là token chứng minh sở hữu (PoP), nhằm tạo ra một hệ thống xác thực đa lớp có khả năng chống lại các cuộc tấn công đánh cắp token và tấn công phát lại. Kiến trúc được thiết kế để triển khai trên môi trường đám mây AWS với trọng tâm vào việc so sánh hiệu suất của các thuật toán mã hóa khác nhau.
 
 ### Mục tiêu nghiên cứu:
 - Xây dựng một API proxy gateway với Zero-Trust authentication
@@ -54,22 +54,22 @@ Nghiên cứu này đề xuất một kiến trúc Zero-Trust API authentication
 Zero-Trust là một mô hình bảo mật dựa trên nguyên tắc "never trust, always verify" (không bao giờ tin tưởng, luôn xác minh). Trong bối cảnh API security, Zero-Trust yêu cầu:
 - Xác thực và ủy quyền mọi request API
 - Kiểm tra liên tục danh tính và quyền hạn
-- Giảm thiểu surface attack thông qua least privilege access
+- Giảm thiểu diện tấn công thông qua truy cập đặc quyền tối thiểu
 - Giám sát và audit toàn diện mọi giao dịch
 
 #### Mutual TLS (mTLS)
 mTLS là một extension của TLS protocol trong đó cả client và server đều phải xác thực lẫn nhau thông qua digital certificates:
-- **Transport Layer Security**: Mã hóa end-to-end communication
-- **Bidirectional Authentication**: Cả hai bên đều verify identity
-- **Certificate-based Identity**: Sử dụng PKI infrastructure cho strong authentication
-- **Perfect Forward Secrecy**: Bảo vệ dữ liệu quá khứ nếu private key bị compromise
+- **Transport Layer Security**: Mã hóa giao tiếp đầu cuối
+- **Bidirectional Authentication**: Cả hai bên đều xác minh danh tính
+- **Certificate-based Identity**: Sử dụng cơ sở hạ tầng PKI cho xác thực mạnh
+- **Perfect Forward Secrecy**: Bảo vệ dữ liệu quá khứ nếu khóa riêng tư bị xâm phạm
 
 #### Token-Based Signatures (Proof of Possession)
-Proof of Possession (PoP) tokens là một cơ chế xác thực trong đó client phải chứng minh việc sở hữu cryptographic key được liên kết với access token:
-- **DPoP (Demonstrating Proof of Possession)**: Client tạo JWT proof ký bằng private key
-- **Holder-of-Key (HoK)**: Token được bind với specific cryptographic key
-- **Replay Attack Prevention**: Mỗi request yêu cầu fresh cryptographic proof
-- **Token Binding**: Liên kết token với certificate hoặc public key
+Token chứng minh sở hữu (PoP) là một cơ chế xác thực trong đó client phải chứng minh việc sở hữu khóa mã hóa được liên kết với token truy cập:
+- **DPoP (Demonstrating Proof of Possession)**: Client tạo bằng chứng JWT ký bằng khóa riêng tư
+- **Holder-of-Key (HoK)**: Token được ràng buộc với khóa mã hóa cụ thể
+- **Ngăn tấn công phát lại**: Mỗi yêu cầu cần bằng chứng mã hóa mới
+- **Ràng buộc Token**: Liên kết token với chứng chỉ hoặc khóa công khai
 
 ### 2.2 Motivation
 
@@ -83,28 +83,28 @@ Threat Model:
 │ Application │    │   (MitM)    │    │             │
 └─────────────┘    └─────────────┘    └─────────────┘
                          │
-                   Token Theft &
+                   Đánh cắp Token &
                    Unauthorized Use
 ```
 
-1. **Token Theft**: Bearer tokens có thể bị đánh cắp thông qua XSS, malware, hoặc network interception
-2. **Replay Attacks**: Stolen tokens có thể được sử dụng lại mà không cần additional authentication
-3. **No Cryptographic Binding**: Tokens không được liên kết với specific client identity
-4. **Wide Attack Surface**: Tokens valid ở bất kỳ đâu chúng được present
+1. **Token Theft**: Token mang có thể bị đánh cắp thông qua XSS, malware, hoặc chặn bắt mạng
+2. **Replay Attacks**: Token bị đánh cắp có thể được sử dụng lại mà không cần xác thực bổ sung
+3. **No Cryptographic Binding**: Token không được liên kết với danh tính client cụ thể
+4. **Wide Attack Surface**: Token có hiệu lực ở bất kỳ đâu chúng được xuất trình
 
 **TLS-Only Limitations:**
-1. **Single Point of Failure**: Chỉ dựa vào server certificate validation
-2. **No Client Authentication**: Không thể verify client identity
-3. **Certificate Pinning Challenges**: Khó implement và maintain trong dynamic environments
+1. **Single Point of Failure**: Chỉ dựa vào xác thực chứng chỉ máy chủ
+2. **No Client Authentication**: Không thể xác minh danh tính client
+3. **Certificate Pinning Challenges**: Khó triển khai và duy trì trong môi trường động
 
 #### Nhu cầu về Enhanced Security
-Với sự gia tăng của sophisticated attacks và compliance requirements (PCI DSS, SOX, GDPR), các tổ chức cần:
-- Multi-factor authentication cho API access
-- Strong cryptographic identity binding
-- Comprehensive audit trails
-- Reduced blast radius khi security breach xảy ra
+Với sự gia tăng của các cuộc tấn công tinh vi và yêu cầu tuân thủ (PCI DSS, SOX, GDPR), các tổ chức cần:
+- Xác thực đa yếu tố cho truy cập API
+- Ràng buộc danh tính mã hóa mạnh
+- Nhật ký kiểm toán toàn diện  
+- Giảm phạm vi thiệt hại khi vi phạm bảo mật xảy ra
 
-### 2.3 Related Work
+### 2.3 Công trình liên quan
 
 #### Academic Research
 
@@ -116,7 +116,7 @@ Về mặt kiến trúc Zero-Trust, NIST SP 800-207 [4] đã đưa ra định ng
 
 Ngành tài chính đã dẫn đầu trong việc áp dụng bảo mật API nâng cao. Payment Services Directive 2 (PSD2) [7] của Liên minh Châu Âu đã quy định bắt buộc xác thực clients mạnh cho cho dịch vụ thanh toán, tạo động lực cho việc phát triển hồ sơ bảo mật API cấp độ Tài chính (Financial-grade API - FAPI) [8]. Nhóm Làm việc FAPI tại OpenID Foundation đã phát triển các yêu cầu bảo mật toàn diện sử dụng mTLS và signed JWTs, được nhiều ngân hàng lớn như Barclays, HSBC, và Deutsche Bank áp dụng [9]. SWIFT đã cập nhật các yêu cầu Chương trình Bảo mật Khách hàng (CSP) [10] để bao gồm nhắn tin an toàn với xác thực dựa trên chứng chỉ (certificate-based authentication).
 
-Các công ty công nghệ lớn đã triển khai nhiều phương pháp khác nhau cho xác thực giữa các dịch vụ. Google đã phát triển Istio service mesh [11] với mTLS tự động giữa các services, hiện được sử dụng rộng rãi trong Kubernetes environments. Netflix đã mở mã nguồn Zuul gateway [12] với hỗ trợ cho xác thực dựa trên chứng chỉ, xử lý hàng triệu requests mỗi ngày. Uber đã công bố nghiên cứu điển hình [13] về xác thực dịch vụ nội bộ sử dụng mTLS, báo cáo giảm 99.9% trong sự cố bảo mật. Spotify đã chia sẻ triển khai [14] của OAuth 2.0 PKCE với ràng buộc chứng chỉ cho mobile applications cho ứng dụng di động.
+Các công ty công nghệ lớn đã triển khai nhiều phương pháp khác nhau cho xác thực giữa các dịch vụ. Google đã phát triển Istio service mesh [11] với mTLS tự động giữa các services, hiện được sử dụng rộng rãi trong Kubernetes environments. Netflix đã mở mã nguồn Zuul gateway [12] với hỗ trợ cho xác thực dựa trên chứng chỉ, xử lý hàng triệu requests mỗi ngày. Uber đã công bố nghiên cứu điển hình [13] về xác thực dịch vụ nội bộ sử dụng mTLS, báo cáo giảm 99.9% trong sự cố bảo mật. Spotify đã chia sẻ triển khai [14] của **OAuth 2.0 PKCE** với ràng buộc chứng chỉ cho ứng dụng di động.
 
 #### Existing Solutions Analysis
 
@@ -124,62 +124,7 @@ Các giải pháp hiện tại đều có sự đánh đổi riêng biệt. Kong
 
 #### Research Gap
 
-Mặc dù có nhiều theoretical frameworks và individual implementations, vẫn thiếu nghiên cứu comprehensive về performance implications của việc kết hợp mTLS với token-based signatures trong production environments. Đặc biệt, chưa có systematic comparison về impact của different cryptographic algorithms (ECDSA, RSA, Ed25519) trên real-world workloads. Current literature cũng thiếu practical guidance về operational aspects như certificate lifecycle management, key rotation strategies, và cost-performance optimization cho cloud deployments.
-
-#### Tài liệu tham khảo:
-[1] RFC 7800: Proof-of-Possession Key Semantics for JSON Web Tokens (JWT), IETF, 2016  
-    https://tools.ietf.org/rfc/rfc7800.txt
-
-[2] RFC 9449: OAuth 2.0 Demonstrating Proof-of-Possession at the Application Layer (DPoP), IETF, 2023  
-    https://tools.ietf.org/rfc/rfc9449.txt
-
-[3] RFC 8705: OAuth 2.0 Mutual-TLS Client Authentication and Certificate-Bound Access Tokens, IETF, 2020  
-    https://tools.ietf.org/rfc/rfc8705.txt
-
-[4] NIST SP 800-207: Zero Trust Architecture, NIST, 2020  
-    https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-207.pdf
-
-[5] Ward, R., & Beyer, B. "BeyondCorp: A New Approach to Enterprise Security", USENIX, 2014  
-    https://www.usenix.org/conference/lisa14/conference-program/presentation/ward
-
-[6] Microsoft Zero Trust Security Model, Microsoft Documentation, 2021  
-    https://docs.microsoft.com/en-us/security/zero-trust/
-
-[7] EU Payment Services Directive 2 (PSD2), European Parliament, 2015  
-    https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=celex%3A32015L2366
-
-[8] Financial-grade API Security Profile 1.0, OpenID Foundation, 2021  
-    https://openid.net/specs/openid-financial-api-part-1-1_0.html
-
-[9] Open Banking Implementation Entity, "Open Banking Security Profile", 2020  
-    https://standards.openbanking.org.uk/security-profiles/
-
-[10] SWIFT Customer Security Programme (CSP), SWIFT, 2022  
-     https://www.swift.com/myswift/customer-security-programme-csp
-
-[11] Istio Service Mesh Documentation, Google/IBM/Lyft, 2023  
-     https://istio.io/latest/docs/
-
-[12] Zuul Gateway, Netflix OSS, GitHub Repository, 2023  
-     https://github.com/Netflix/zuul
-
-[13] "Scaling Uber's Identity Platform", Uber Engineering Blog, 2019  
-     https://eng.uber.com/scaling-ubers-identity-platform/
-
-[14] "Mobile API Security at Spotify", Spotify Engineering Blog, 2020  
-     https://engineering.atspotify.com/2020/02/mobile-api-security/
-
-[15] Kong Gateway Documentation, Kong Inc., 2023  
-     https://docs.konghq.com/gateway/
-
-[16] Istio Security Best Practices, Istio Documentation, 2023  
-     https://istio.io/latest/docs/ops/best-practices/security/
-
-[17] AWS API Gateway Developer Guide, Amazon Web Services, 2023  
-     https://docs.aws.amazon.com/apigateway/
-
-[18] Envoy Proxy Documentation, CNCF, 2023  
-     https://www.envoyproxy.io/docs/envoy/latest/
+Mặc dù có nhiều khung lý thuyết và triển khai riêng lẻ, vẫn thiếu nghiên cứu toàn diện về tác động hiệu suất của việc kết hợp mTLS với chữ ký dựa trên token trong môi trường sản xuất. Đặc biệt, chưa có so sánh có hệ thống về ảnh hưởng của các thuật toán mã hóa khác nhau (ECDSA, RSA, Ed25519) trên khối lượng công việc thực tế. Tài liệu hiện tại cũng thiếu hướng dẫn thực tế về các khía cạnh vận hành như quản lý vòng đời chứng chỉ, chiến lược xoay khóa, và tối ưu hóa hiệu suất chi phí cho triển khai đám mây.
 
 ## 3. Methodology
 
@@ -246,11 +191,11 @@ CloudWatch thực hiện giám sát toàn diện với các chỉ số, nhật k
       │ + Authorization Header│                       │
       │ + DPoP Proof Header   │                       │
       ├──────────────────────▶│                       │
-      │                       │ 4. Token Validation   │
-      │                       │ 5. DPoP Verification  │
-      │                       │ 6. Cert-Token Binding │
+      │                       │ 4. Xác thực Token     │
+      │                       │ 5. Xác minh DPoP      │
+      │                       │ 6. Ràng buộc Cert-Token│
       │                       │                       │
-      │                       │ 7. Authorized Request │
+      │                       │ 7. Yêu cầu được ủy quyền │
       │                       ├──────────────────────▶│
       │                       │                       │
       │                       │ 8. Response           │
@@ -262,90 +207,80 @@ CloudWatch thực hiện giám sát toàn diện với các chỉ số, nhật k
 
 **Cụ thể:**
 
-**Bước 1-2: mTLS Handshake & Certificate Validation**
-- Client khởi tạo TLS connection và gửi client certificate (X.509) chứa public key
-- Proxy thực hiện certificate validation theo chuỗi:
+**Bước 1-2: mTLS Handshake & Xác thực chứng chỉ**
+- Client khởi tạo kết nối TLS và gửi chứng chỉ client (X.509) chứa khóa công khai
+- Proxy thực hiện xác thực chứng chỉ theo chuỗi:
   ```
-  Certificate Chain Validation:
-  ├── Certificate signature verification (sử dụng CA public key)
-  ├── Certificate expiry check (notBefore/notAfter timestamps)
-  ├── Revocation status check (CRL/OCSP query)
-  ├── Certificate policies và key usage validation
-  └── Subject Alternative Name (SAN) verification
+  Xác thực chuỗi chứng chỉ:
+  ├── Xác minh chữ ký chứng chỉ (sử dụng khóa công khai CA)
+  ├── Kiểm tra hạn chứng chỉ (timestamps notBefore/notAfter)
+  ├── Kiểm tra trạng thái thu hồi (truy vấn CRL/OCSP)
+  ├── Xác thực chính sách chứng chỉ và sử dụng khóa
+  └── Xác minh tên thay thế chủ thể (SAN)
   ```
-- Nếu validation thành công, secure TLS channel được thiết lập với Perfect Forward Secrecy
+- Nếu xác thực thành công, kênh TLS an toàn được thiết lập với Perfect Forward Secrecy
 
-**Bước 3: HTTP Request với Dual Authentication Headers**
-Client gửi HTTP request với hai authentication mechanisms:
+**Bước 3: HTTP Request với Headers xác thực kép**
+Client gửi HTTP request với hai cơ chế xác thực:
 ```
 Authorization: DPoP <access_token>
 DPoP: <dpop_proof_jwt>
 
 Trong đó:
-- access_token: JWT với cnf (confirmation) claim liên kết đến client certificate
-- dpop_proof_jwt: JWT proof ký bằng private key tương ứng với certificate
+- access_token: JWT với claim xác nhận (cnf) liên kết đến chứng chỉ client
+- dpop_proof_jwt: Bằng chứng JWT ký bằng khóa riêng tư tương ứng với chứng chỉ
 ```
 
-**Bước 4: Access Token Validation**
-Proxy thực hiện comprehensive token validation:
+**Bước 4: Xác thực token truy cập**
+Proxy thực hiện xác thực token toàn diện:
 ```
-Token Validation Process:
-├── JWT signature verification (sử dụng issuer's public key)
-├── Token expiry check (exp claim)
-├── Audience validation (aud claim)
-├── Issuer verification (iss claim)
-├── Not-before check (nbf claim)
-└── Confirmation claim extraction (cnf claim)
-```
-
-**Bước 5: DPoP Proof Verification**
-Proxy validation DPoP proof JWT:
-```
-DPoP Proof Validation:
-├── JWT signature verification (sử dụng client's public key từ certificate)
-├── HTTP method matching (htm claim)
-├── Target URL matching (htu claim)
-├── Timestamp freshness check (iat claim, typically <60 seconds)
-├── Unique identifier verification (jti claim - prevent replay)
-└── Public key confirmation (jwk claim matches certificate)
+Quy trình xác thực Token:
+├── Xác minh chữ ký JWT (sử dụng khóa công khai của issuer)
+├── Kiểm tra hạn token (claim exp)
+├── Xác thực đối tượng (claim aud)
+├── Xác minh issuer (claim iss)
+├── Kiểm tra not-before (claim nbf)
+└── Trích xuất claim xác nhận (claim cnf)
 ```
 
-**Bước 6: Certificate-Token Binding Verification**
-Critical security step - xác minh cryptographic binding:
+**Bước 5: Xác minh bằng chứng DPoP**
+Proxy xác thực JWT bằng chứng DPoP:
 ```
-Binding Verification Process:
-├── Extract public key từ client certificate
-├── Extract confirmation claim (cnf) từ access token
-├── Compare certificate thumbprint với cnf.x5t#S256
-├── Verify DPoP proof signature matches certificate private key
-└── Ensure temporal consistency (all components have valid timestamps)
+Xác thực bằng chứng DPoP:
+├── Xác minh chữ ký JWT (sử dụng khóa công khai client từ chứng chỉ)
+├── Khớp phương thức HTTP (claim htm)
+├── Khớp URL đích (claim htu)
+├── Kiểm tra timestamp (claim iat, thường <60 giây)
+├── Xác minh mã định danh duy nhất (claim jti - ngăn phát lại)
+└── Xác nhận khóa công khai (claim jwk khớp với chứng chỉ)
 ```
 
-**Bước 7-8: Backend Service Communication**
-- Nếu tất cả validations pass, proxy forwards request đến backend service
-- Request được enrich với verified identity information và security context
+**Bước 6: Xác minh ràng buộc chứng chỉ-Token**
+Bước bảo mật quan trọng - xác minh ràng buộc mã hóa:
+```
+Quy trình xác minh ràng buộc:
+├── Trích xuất khóa công khai từ chứng chỉ client
+├── Trích xuất claim xác nhận (cnf) từ access token
+├── So sánh dấu vân tay chứng chỉ với cnf.x5t#S256
+├── Xác minh chữ ký bằng chứng DPoP khớp với khóa riêng tư chứng chỉ
+└── Đảm bảo tính nhất quán thời gian (tất cả thành phần có timestamps hợp lệ)
+```
+
+**Bước 7-8: Giao tiếp dịch vụ Backend**
+- Nếu tất cả validations đạt, proxy chuyển tiếp request đến backend service
+- Request được làm phong phú với thông tin danh tính đã xác minh và security context
 - Backend service xử lý business logic và trả về response
 
-**Bước 9: Response Delivery**
-- Proxy nhận response từ backend và thực hiện final security checks
-- Audit log được ghi nhận với đầy đủ security context
-- Response được gửi về client qua established mTLS channel
+**Bước 9: Phân phối phản hồi**
+- Proxy nhận response từ backend và thực hiện kiểm tra bảo mật cuối cùng
+- Nhật ký kiểm toán được ghi nhận với đầy đủ security context
+- Response được gửi về client qua kênh mTLS đã thiết lập
 
-**Security Checkpoints Summary:**
-```
-Multi-layered Validation:
-├── Layer 1: mTLS Certificate Authentication (Transport)
-├── Layer 2: Bearer Token Authorization (Application)  
-├── Layer 3: DPoP Proof-of-Possession (Cryptographic Binding)
-├── Layer 4: Certificate-Token Binding Verification (Anti-theft)
-└── Layer 5: Replay Prevention (Temporal + Nonce validation)
-```
-
-**Failure Handling:**
-- Mỗi validation step failure dẫn đến immediate request rejection
-- Comprehensive error logging cho security monitoring
-- Rate limiting và anomaly detection cho suspicious patterns
-- Automatic certificate revocation triggering nếu compromise detected
+**Xử lý lỗi:**
+- Mỗi bước xác thực không thông qua dẫn đến từ chối yêu cầu trực tiếp
+- Thu thập nhật ký lỗi cho giám sát bảo mật
+- Giới hạn tốc độ và phát hiện bất thường cho các mẫu đáng ngờ
+- Kích hoạt thu hồi chứng chỉ tự động nếu phát hiện bị xâm phạm
 
 #### Techstack
 
@@ -363,41 +298,41 @@ Agent cấp chứng chỉ (CA) được thiết lập bằng OpenSSL hoặc CFSS
 #### Ưu điểm của kiến trúc
 
 **Enhanced Security:**
-1. **Multi-layered Authentication**: Kết hợp certificate-based và token-based authentication
-2. **Cryptographic Binding**: Tokens được bind với certificates thông qua cnf claims
-3. **Replay Attack Prevention**: DPoP proofs bao gồm timestamp, nonce, và request-specific data
-4. **Reduced Token Theft Impact**: Stolen tokens không thể sử dụng mà không có corresponding private key
+1. **Multi-layered Authentication**: Kết hợp xác thực dựa trên chứng chỉ và xác thực dựa trên token
+2. **Cryptographic Binding**: Token được ràng buộc với chứng chỉ thông qua các claim cnf
+3. **Replay Attack Prevention**: Bằng chứng DPoP bao gồm dấu thời gian, nonce, và dữ liệu cụ thể theo yêu cầu
+4. **Reduced Token Theft Impact**: Token bị đánh cắp không thể sử dụng mà không có khóa riêng tư tương ứng
 
 **Operational Benefits:**
-1. **Centralized Policy Enforcement**: Tại proxy layer
-2. **Scalable Architecture**: Auto Scaling Groups và Multi-AZ deployment  
-3. **Cloud-native Integration**: Leverage AWS managed services
-4. **Comprehensive Monitoring**: CloudWatch, X-Ray integration
+1. **Centralized Policy Enforcement**: Tại lớp proxy
+2. **Kiến trúc có khả năng mở rộng**: Nhóm **Auto Scaling** và triển khai **Multi-AZ**
+3. **Cloud-native Integration**: Tận dụng các dịch vụ được quản lý của AWS
+4. **Giám sát toàn diện**: Tích hợp **CloudWatch**, **X-Ray**
 
-#### Thách thức và limitations
+#### Thách thức và hạn chế
 
-**Performance Overhead:**
-- Additional cryptographic operations
-- Certificate validation latency
-- DPoP proof generation và verification time
+**Chi phí phụ về hiệu suất:**
+- Các tính toán mã hóa bổ sung
+- Độ trễ xác thực chứng chỉ
+- Thời gian tạo và xác minh bằng chứng DPoP
 
 **Operational Complexity:**
-- PKI infrastructure management
-- Certificate lifecycle automation
-- Key rotation procedures
+- Quản lý cơ sở hạ tầng PKI
+- Tự động hóa vòng đời chứng chỉ
+- Quy trình xoay khóa
 
 **Client Implementation:**
-- Library support cho DPoP
-- Secure key storage requirements
-- Certificate enrollment processes
+- Hỗ trợ thư viện cho DPoP
+- Yêu cầu lưu trữ khóa an toàn
+- Quy trình đăng ký chứng chỉ
 
-### 3.3 Evaluation
+### 3.3 Đánh giá
 
-Phần evaluation sẽ tập trung vào ba research questions chính:
+Phần đánh giá sẽ tập trung vào ba câu hỏi nghiên cứu chính:
 
 #### **RQ1: Security Effectiveness Analysis**
 
-*"Kết hợp mTLS và token-based PoP có giảm đáng kể nguy cơ token theft/replay so với chỉ dùng bearer JWT + TLS không?"*
+*"Kết hợp mTLS và PoP dựa trên token có giảm đáng kể nguy cơ đánh cắp token/phát lại so với chỉ dùng JWT mang + TLS không?"*
 
 **Phương pháp đánh giá:**
 
@@ -407,35 +342,35 @@ Phần evaluation sẽ tập trung vào ba research questions chính:
    - Phân tích blast radius khi compromise
 
 2. **Security Testing:**
-   - Token theft simulation
+   - Mô phỏng đánh cắp token
    - Replay attack testing  
-   - Man-in-the-middle testing
-   - Certificate validation bypass attempts
+   - Kiểm tra tấn công trung gian
+   - Thử nghiệm bỏ qua xác thực chứng chỉ
 
 3. **Comparative Analysis:**
    ```
-   Test Scenarios:
-   ├── Bearer JWT + TLS (baseline)
-   ├── mTLS only
-   ├── Bearer JWT + mTLS  
-   └── mTLS + DPoP (proposed)
+   Kịch bản kiểm tra:
+   ├── JWT mang + TLS (cơ sở)
+   ├── chỉ mTLS
+   ├── JWT mang + mTLS  
+   └── mTLS + DPoP (đề xuất)
    
-   Attack Vectors:
-   ├── XSS-based token theft
-   ├── Network interception
-   ├── Endpoint compromise
-   ├── Replay attacks
-   └── Certificate spoofing
+   Véc-tơ tấn công:
+   ├── Đánh cắp token dựa trên XSS
+   ├── Chặn bắt mạng
+   ├── Xâm phạm điểm cuối
+   ├── Tấn công phát lại
+   └── Giả mạo chứng chỉ
    ```
 
 **Kỳ vọng kết quả:**
-- Giảm 95%+ khả năng token theft thành công
-- Loại bỏ hoàn toàn replay attacks với fresh DPoP proofs
-- Tăng effort requirement cho attackers từ 1x lên 100x+
+- Giảm 95%+ khả năng đánh cắp token thành công
+- Loại bỏ hoàn toàn tấn công phát lại với bằng chứng DPoP mới
+- Tăng yêu cầu nỗ lực cho kẻ tấn công từ 1x lên 100x+
 
-#### **RQ2: Performance Impact Assessment**
+#### **RQ2: Đánh giá tác động hiệu suất**
 
-*"Overhead (latency, throughput) của việc kiểm tra mTLS + token binding ở proxy là bao nhiêu, và có thể tối ưu bằng caching/edge verification không?"*
+*"Chi phí phụ (độ trễ, thông lượng) của việc kiểm tra mTLS + ràng buộc token ở proxy là bao nhiêu, và có thể tối ưu bằng bộ nhớ đệm/xác minh biên không?"*
 
 **Phương pháp đo lường:**
 
@@ -450,117 +385,111 @@ Phần evaluation sẽ tập trung vào ba research questions chính:
    └── CloudWatch monitoring (basic metrics)
    
    Test Parameters:
-   ├── Concurrent users: 10, 50, 100, 200 (scaled for low-end hardware)
-   ├── Request patterns: sustained, burst
-   ├── Certificate algorithms: ECDSA P-256, RSA-2048, Ed25519
-   └── Token algorithms: ES256, RS256, EdDSA
+   ├── Concurrent users: 10, 50, 100, 200 
+   ├── Mẫu yêu cầu: bền vững, bùng nổ
+   ├── Thuật toán chứng chỉ: ECDSA P-256, RSA-2048, Ed25519
+   └── Thuật toán token: ES256, RS256, EdDSA
    ```
 
-2. **Performance Metrics:**
+2. **Số liệu hiệu suất:**
    ```
-   Latency Measurements:
-   ├── TLS handshake time
-   ├── Certificate validation time
-   ├── Token verification time
-   ├── DPoP proof validation time
-   ├── Certificate-token binding check time
-   └── End-to-end request latency
+   Đo lường độ trễ:
+   ├── Thời gian bắt tay TLS
+   ├── Thời gian xác thực chứng chỉ
+   ├── Thời gian xác minh token
+   ├── Thời gian xác thực bằng chứng DPoP
+   ├── Thời gian kiểm tra ràng buộc chứng chỉ-token
+   └── Độ trễ yêu cầu đầu cuối
    
-   Throughput Measurements:
-   ├── Requests per second (RPS)
-   ├── Concurrent connection capacity
-   ├── Error rates under load
-   └── Resource utilization (CPU, Memory, Network)
+   Đo lường thông lượng:
+   ├── Yêu cầu mỗi giây (RPS)
+   ├── Khả năng kết nối đồng thời
+   ├── Tỷ lệ lỗi dưới tải
+   └── Sử dụng tài nguyên (CPU, Bộ nhớ, Mạng)
    ```
 
 3. **Optimization Testing:**
    ```
-   Optimization Strategies (cho low-end hardware):
-   ├── Certificate validation caching (critical for performance)
-   ├── TLS session resumption (reduce handshake overhead)
-   ├── Token verification result caching (Redis-based)
-   ├── Connection pooling (reduce connection overhead)
-   ├── Algorithm selection (Ed25519 preferred for resource efficiency)
-   ├── Request batching (reduce per-request overhead)
-   ├── Memory management (garbage collection tuning)
-   └── Process optimization (single-threaded vs multi-threaded)
+   Chiến lược tối ưu hóa:
+   ├── Bộ nhớ đệm xác thực chứng chỉ (quan trọng cho hiệu suất)
+   ├── Khôi phục phiên TLS (giảm chi phí phụ bắt tay)
+   ├── Bộ nhớ đệm kết quả xác minh token (dựa trên Redis)
+   ├── Lựa chọn thuật toán (Ed25519 được ưu tiên cho hiệu quả tài nguyên)
+   ├── Gom nhóm requests (giảm chi phí phụ mỗi yêu cầu)
+   ├── Quản lý bộ nhớ (điều chỉnh thu gom rác)
+   └── Tối ưu hóa quy trình (đơn luồng so với đa luồng)
    
    Resource Constraints Considerations:
-   ├── Memory: Limit concurrent connections, implement backpressure
-   ├── CPU: Prefer Ed25519, cache verification results aggressively
-   ├── Network: Connection pooling, keep-alive optimization
-   └── Storage: Use in-memory caching, minimize disk I/O
+   ├── Memory: Giới hạn số kết nối đồng thời.
+   ├── CPU: Ưu tiên Ed25519, đệm kết quả xác thực
+   ├── Mạng: Gộp requests, tối ưu hóa duy trì kết nối
+   └── Lưu trữ: Sử dụng bộ nhớ in-memory để đệm, giảm thiểu disk I/O
    ```
 
 **Kỳ vọng kết quả:**
-- Base overhead: 40-60ms per request (do hardware hạn chế)
+- Base overhead: 40-60ms per request
 - Optimized overhead: 15-25ms per request (với caching)
 - Throughput: 200-500 RPS (t3a.small), 100-200 RPS (t3a.micro)
 - Resource utilization: CPU 60-80%, Memory 70-90% under moderate load
 
-#### **RQ3: Operational Strategy Evaluation**
+#### **RQ3: Đánh giá chiến lược hoạt động**
 
 *"Chiến lược vận hành (CA, cert rotation, PKI automation) nào cân bằng tốt nhất giữa an toàn và vận hành đơn giản cho môi trường cloud?"*
 
 **Phương pháp đánh giá:**
 
-1. **PKI Strategy Comparison:**
+1. **So sánh chiến lược PKI:**
    ```
-   Evaluated Strategies:
+   Các chiến lược được đánh giá:
    ├── AWS Private CA + ACM
-   ├── HashiCorp Vault PKI
-   ├── Self-hosted OpenSSL CA
-   ├── Hybrid (Internal Root + Cloud Issuing)
    └── Public CA (Let's Encrypt, DigiCert)
    
-   Evaluation Criteria:
-   ├── Setup complexity (1-10 scale)
-   ├── Operational overhead (person-hours/month)
-   ├── Security posture (risk assessment)
-   ├── Cost analysis ($/month)
-   ├── Automation capabilities
-   └── Disaster recovery readiness
+   Tiêu chí đánh giá:
+   ├── Độ phức tạp thiết lập (thang điểm 1-10)
+   ├── Chi phí phụ vận hành (giờ người/tháng)
+   ├── Phân tích chi phí ($/tháng)
+   ├── Khả năng tự động hóa
+   └── Sẵn sàng khôi phục thảm họa
    ```
 
-2. **Certificate Lifecycle Management:**
+2. **Quản lý vòng đời chứng chỉ:**
    ```
-   Testing Scenarios:
-   ├── Certificate issuance automation
-   ├── Rotation procedures (30, 60, 90-day cycles)
-   ├── Emergency revocation
-   ├── Bulk certificate management
-   ├── Cross-environment certificate sync
-   └── Compliance reporting
+   Kịch bản kiểm tra:
+   ├── Tự động hóa cấp phát chứng chỉ
+   ├── Quy trình xoay vòng (chu kỳ 30, 60, 90 ngày)
+   ├── Thu hồi khẩn cấp
+   ├── Quản lý chứng chỉ hàng loạt
+   ├── Đồng bộ chứng chỉ liên môi trường
+   └── Báo cáo tuân thủ
    ```
 
-3. **Automation Assessment:**
+3. **Đánh giá tự động hóa:**
    ```
-   Automation Levels:
-   ├── Full automation (ACME protocol)
-   ├── Semi-automated (Terraform + approval workflows)
-   ├── Manual with tooling support
-   └── Fully manual processes
+   Mức độ tự động hóa:
+   ├── Tự động hoàn toàn (giao thức **ACME**)
+   ├── Bán tự động (**Terraform** + quy trình phê duyệt)
+   ├── Thủ công với công cụ hỗ trợ 
+   └── Quy trình hoàn toàn thủ công
    
-   Success Metrics:
-   ├── Mean Time to Certificate Issuance (MTTCI)
-   ├── Certificate expiry incidents
-   ├── Rotation success rate
-   ├── Operational cost per certificate
-   └── Security incident correlation
+   Tiêu chí đánh giá:
+   ├── Thời gian trung bình cấp phát chứng chỉ (**MTTCI**)
+   ├── Sự cố hết hạn chứng chỉ
+   ├── Tỷ lệ thành công xoay vòng
+   ├── Chi phí vận hành mỗi chứng chỉ
+   └── Tương quan sự cố bảo mật
    ```
 
 **Kỳ vọng kết quả:**
-- AWS Private CA + automated rotation: 85% giảm operational overhead
-- 90-day rotation cycle: optimal balance security vs. operations
-- Infrastructure-as-Code: 70% giảm configuration errors
-- ACME protocol integration: 95% automation rate
+- **AWS Private CA** + xoay vòng tự động: giảm chi phí phụ vận hành
+- **Infrastructure-as-Code**: 70% giảm lỗi cấu hình
+- Tích hợp giao thức **ACME**: 95% tỷ lệ tự động hóa
 
-#### **Comparative Algorithm Analysis**
+#### **Phân tích so sánh thuật toán**
 
-Một phần quan trọng của evaluation là so sánh hiệu suất các thuật toán mã hóa:
+Một phần quan trọng của đánh giá là so sánh hiệu suất các thuật toán mã hóa:
 
 ```
-Algorithm Performance Matrix (trên t3a.micro/small):
+Ma trận hiệu suất thuật toán (trên **t3a.micro/small**):
 
                  ECDSA P-256    RSA-2048      Ed25519
 Certificate Gen    ?ms          ?ms           ?ms
@@ -571,44 +500,32 @@ Memory Usage       ?            ?             ?
 CPU Usage          ?            ?             ?
 Key Size          256-bit       2048-bit      255-bit
 Security Level    ~128-bit      ~112-bit      ~128-bit
-
-Performance trên low-end hardware:
-├── Ed25519: Fastest overall, least resource intensive
-├── ECDSA P-256: Good balance, moderate resource usage  
-├── RSA-2048: Slowest, highest resource consumption
-└── Bottleneck: CPU and memory constraints more pronounced
 ```
 
-#### **Demo Implementation**
+#### **Triển khai demo**
 
-Để validate các findings, sẽ xây dựng một demo application:
+Để xác thực các phát hiện, sẽ xây dựng một ứng dụng demo mô phỏng giao tiếp giữa client và server trong hệ thống micro-services:
 
-**Banking API Simulation:**
+**Kiến trúc demo micro-services:**
 ```
-Demo Scenarios:
-├── Customer authentication via mTLS
-├── Account balance queries  
-├── Fund transfers với DPoP tokens
-├── Transaction history retrieval
-├── Real-time performance monitoring
-└── Security event demonstration
-
-Interactive Features:
-├── Algorithm switching (live comparison)
-├── Attack simulation (token theft, replay)
-├── Performance dashboard
-├── Certificate management interface
-└── Audit log visualization
+Kịch bản demo:
+├── Client application xác thực qua mTLS
+├── API Gateway proxy với xác thực Zero-Trust
+├── Service-to-service communication với DPoP tokens
+├── User Service (quản lý danh tính người dùng)
+├── Product Service (quản lý sản phẩm)
+├── Giám sát hiệu suất thời gian thực
+└── Minh họa sự kiện bảo mật
 ```
 
-**Performance Visualization:**
-- Real-time latency graphs
-- Throughput comparison charts
-- Resource utilization monitoring
-- Security event correlation
-- Cost analysis dashboard
+**Trực quan hóa hiệu suất:**
+- Biểu đồ độ trễ thời gian thực
+- Biểu đồ so sánh thông lượng
+- Giám sát sử dụng tài nguyên
+- Tương quan sự kiện bảo mật
+- Bảng điều khiển phân tích chi phí
 
-## 4. Conclusion
+## 4. Kết luận
 
 Nghiên cứu này đề xuất một kiến trúc Zero-Trust API authentication kết hợp mTLS và token-based signatures nhằm tăng cường bảo mật cho API trong môi trường cloud. Kiến trúc được thiết kế để giải quyết các hạn chế của bearer tokens truyền thống thông qua việc tạo ra cryptographic binding giữa client certificates và access tokens.
 
@@ -616,7 +533,7 @@ Nghiên cứu này đề xuất một kiến trúc Zero-Trust API authentication
 
 1. **Kiến trúc tích hợp**: Kết hợp mTLS với DPoP tokens tạo ra multi-layered authentication với strong cryptographic binding
 
-2. **Performance analysis**: So sánh comprehensive các thuật toán mã hóa (ECDSA, RSA, Ed25519) trong production environment
+2. **Phân tích hiệu suất**: So sánh toàn diện các thuật toán mã hóa (**ECDSA**, **RSA**, **Ed25519**) trong môi trường sản xuất
 
 3. **Operational strategies**: Đề xuất các chiến lược PKI automation phù hợp với cloud-native environments
 
@@ -625,18 +542,18 @@ Nghiên cứu này đề xuất một kiến trúc Zero-Trust API authentication
 ### Kỳ vọng về tác động:
 
 **Về mặt bảo mật:**
-- Giảm đáng kể nguy cơ token theft và replay attacks
+- Giảm đáng kể nguy cơ đánh cắp token và tấn công phát lại
 - Tăng effort requirement cho attackers
-- Cung cấp comprehensive audit trails
+- Cung cấp nhật ký kiểm toán toàn diện
 
 **Về mặt hiệu suất:**
 - Xác định overhead chính xác của enhanced security measures
 - Đề xuất optimization strategies hiệu quả
-- Balance giữa security và performance
+- Cân bằng giữa bảo mật và hiệu suất
 
 **Về mặt vận hành:**
 - Quản lý PKI dễ dàng thông qua cloud services
-- Quản lý certificate lifecycle tự động
+- Quản lý vòng đời chứng chỉ tự động
 - Làm giảm operational overhead và human errors
 
 ### Nghiên cứu tương lai:
@@ -646,4 +563,60 @@ Nghiên cứu này đề xuất một kiến trúc Zero-Trust API authentication
 3. **Machine learning**: Sử dụng ML cho anomaly detection và adaptive authentication
 4. **Cross-cloud integration**: Multi-cloud PKI federation và trust models
 
-Nghiên cứu này sẽ cung cấp foundation solid cho việc triển khai Zero-Trust API security trong production environments, với focus đặc biệt vào practical considerations như performance, operations, và cost optimization.
+Nghiên cứu này sẽ cung cấp nền tảng vững chắc cho việc triển khai bảo mật API Zero-Trust trong môi trường sản xuất, với trọng tâm đặc biệt vào các cân nhắc thực tế như hiệu suất, vận hành, và tối ưu hóa chi phí.
+
+## 5. Tài liệu tham khảo
+
+[1] RFC 7800: Proof-of-Possession Key Semantics for JSON Web Tokens (JWT), IETF, 2016  
+    https://tools.ietf.org/rfc/rfc7800.txt
+
+[2] RFC 9449: OAuth 2.0 Demonstrating Proof-of-Possession at the Application Layer (DPoP), IETF, 2023  
+    https://tools.ietf.org/rfc/rfc9449.txt
+
+[3] RFC 8705: OAuth 2.0 Mutual-TLS Client Authentication and Certificate-Bound Access Tokens, IETF, 2020  
+    https://tools.ietf.org/rfc/rfc8705.txt
+
+[4] NIST SP 800-207: Zero Trust Architecture, NIST, 2020  
+    https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-207.pdf
+
+[5] Ward, R., & Beyer, B. "BeyondCorp: A New Approach to Enterprise Security", USENIX, 2014  
+    https://www.usenix.org/conference/lisa14/conference-program/presentation/ward
+
+[6] Microsoft Zero Trust Security Model, Microsoft Documentation, 2021  
+    https://docs.microsoft.com/en-us/security/zero-trust/
+
+[7] EU Payment Services Directive 2 (PSD2), European Parliament, 2015  
+    https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=celex%3A32015L2366
+
+[8] Financial-grade API Security Profile 1.0, OpenID Foundation, 2021  
+    https://openid.net/specs/openid-financial-api-part-1-1_0.html
+
+[9] Open Banking Implementation Entity, "Open Banking Security Profile", 2020  
+    https://standards.openbanking.org.uk/security-profiles/
+
+[10] SWIFT Customer Security Programme (CSP), SWIFT, 2022  
+     https://www.swift.com/myswift/customer-security-programme-csp
+
+[11] Istio Service Mesh Documentation, Google/IBM/Lyft, 2023  
+     https://istio.io/latest/docs/
+
+[12] Zuul Gateway, Netflix OSS, GitHub Repository, 2023  
+     https://github.com/Netflix/zuul
+
+[13] "Scaling Uber's Identity Platform", Uber Engineering Blog, 2019  
+     https://eng.uber.com/scaling-ubers-identity-platform/
+
+[14] "Mobile API Security at Spotify", Spotify Engineering Blog, 2020  
+     https://engineering.atspotify.com/2020/02/mobile-api-security/
+
+[15] Kong Gateway Documentation, Kong Inc., 2023  
+     https://docs.konghq.com/gateway/
+
+[16] Istio Security Best Practices, Istio Documentation, 2023  
+     https://istio.io/latest/docs/ops/best-practices/security/
+
+[17] AWS API Gateway Developer Guide, Amazon Web Services, 2023  
+     https://docs.aws.amazon.com/apigateway/
+
+[18] Envoy Proxy Documentation, CNCF, 2023  
+     https://www.envoyproxy.io/docs/envoy/latest/
