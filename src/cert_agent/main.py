@@ -4,10 +4,12 @@ Main Certificate Agent application
 import logging
 from contextlib import asynccontextmanager
 from typing import Optional, List, Dict, Any, AsyncGenerator
-from fastapi import FastAPI, HTTPException, status, Depends
+from fastapi import FastAPI, HTTPException, status, Depends, Body
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 import uvicorn
 
+from .config import get_settings
 from .adapters.aws_adapter import AwsCertificateAdapter
 from .adapters.internal_ca_adapter import InternalCAAdapter
 from .adapters.base_adapter import CertificateAdapterFactory
@@ -15,9 +17,17 @@ from ..shared.models import CertificateRequest, CertificateResponse, Certificate
 from ..shared.interfaces import ICertificateProvider
 
 
+class CertificatePemRequest(BaseModel):
+    """Request model for certificate PEM operations"""
+    certificate_pem: str
+
+
+# Get settings
+settings = get_settings()
+
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
+    level=getattr(logging, settings.LOG_LEVEL.upper()),
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
@@ -53,8 +63,21 @@ class CertificateAgent:
         """Application startup handler"""
         logger.info(f"Starting Certificate Agent with {self.adapter_type} adapter...")
         
+        # Get current settings
+        current_settings = get_settings()
+        
+        # Build config dict for adapter
+        adapter_config = {
+            "ca_cert_path": current_settings.CA_CERT_PATH,
+            "ca_key_path": current_settings.CA_KEY_PATH,
+            "cert_storage_path": current_settings.CERT_STORAGE_PATH,
+            "aws_region": current_settings.AWS_REGION,
+            "aws_access_key_id": current_settings.AWS_ACCESS_KEY_ID,
+            "aws_secret_access_key": current_settings.AWS_SECRET_ACCESS_KEY,
+        }
+        
         # Initialize certificate provider
-        self.cert_provider = CertificateAdapterFactory.create_adapter(self.adapter_type)
+        self.cert_provider = CertificateAdapterFactory.create_adapter(self.adapter_type, adapter_config)
         
         logger.info("Certificate Agent started successfully")
     
@@ -68,8 +91,8 @@ class CertificateAgent:
         """Setup FastAPI middleware"""
         self.app.add_middleware(
             CORSMiddleware,
-            allow_origins=["*"],  # Configure appropriately for production
-            allow_credentials=True,
+            allow_origins=settings.cors_origins_list,
+            allow_credentials=settings.CORS_ALLOW_CREDENTIALS,
             allow_methods=["*"],
             allow_headers=["*"],
         )
@@ -188,7 +211,7 @@ class CertificateAgent:
                 )
         
         @self.app.post("/certificates/validate-chain")
-        async def validate_certificate_chain(certificate_pem: str):
+        async def validate_certificate_chain(request: CertificatePemRequest):
             """Validate certificate chain"""
             try:
                 if not self.cert_provider:
@@ -197,7 +220,7 @@ class CertificateAgent:
                         detail="Certificate provider not initialized"
                     )
                 
-                is_valid = await self.cert_provider.validate_certificate_chain(certificate_pem)
+                is_valid = await self.cert_provider.validate_certificate_chain(request.certificate_pem)
                 return {"valid": is_valid}
                 
             except Exception as e:
@@ -208,7 +231,7 @@ class CertificateAgent:
                 )
         
         @self.app.post("/certificates/check-revocation")
-        async def check_revocation_status(certificate_pem: str):
+        async def check_revocation_status(request: CertificatePemRequest):
             """Check certificate revocation status"""
             try:
                 if not self.cert_provider:
@@ -217,7 +240,7 @@ class CertificateAgent:
                         detail="Certificate provider not initialized"
                     )
                 
-                status_result = await self.cert_provider.check_revocation_status(certificate_pem)
+                status_result = await self.cert_provider.check_revocation_status(request.certificate_pem)
                 return {"status": status_result.value}
                 
             except Exception as e:
@@ -260,13 +283,23 @@ class CertificateAgent:
 
 
 # Create certificate agent instance
-cert_agent = CertificateAgent()
+cert_agent = CertificateAgent(adapter_type=settings.CERT_ADAPTER)
 app = cert_agent.app
 
 
-def run_cert_agent(adapter_type: str = "aws", host: str = "0.0.0.0", port: int = 8080):
+def run_cert_agent(
+    adapter_type: Optional[str] = None, 
+    host: Optional[str] = None, 
+    port: Optional[int] = None
+):
     """Run the certificate agent server"""
     global cert_agent
+    
+    # Use settings if parameters not provided
+    adapter_type = adapter_type or settings.CERT_ADAPTER
+    host = host or settings.HOST
+    port = port or settings.PORT
+    
     cert_agent = CertificateAgent(adapter_type=adapter_type)
     
     uvicorn.run(
@@ -274,11 +307,9 @@ def run_cert_agent(adapter_type: str = "aws", host: str = "0.0.0.0", port: int =
         host=host,
         port=port,
         reload=False,
-        log_level="info"
+        log_level=settings.LOG_LEVEL.lower()
     )
 
 
 if __name__ == "__main__":
-    import os
-    adapter_type = os.getenv("CERT_ADAPTER", "aws")
-    run_cert_agent(adapter_type=adapter_type)
+    run_cert_agent()

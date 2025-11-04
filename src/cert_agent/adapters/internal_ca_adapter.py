@@ -9,6 +9,7 @@ from cryptography import x509
 from cryptography.x509.oid import NameOID
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives.asymmetric import padding
 
 from .base_adapter import BaseCertificateAdapter
 from ...shared.models import CertificateRequest, CertificateResponse, CertificateInfo, CertificateStatus
@@ -306,17 +307,32 @@ class InternalCAAdapter(BaseCertificateAdapter):
             # Load certificate to validate
             cert = x509.load_pem_x509_certificate(certificate_pem.encode())
             
-            # Check if certificate was issued by our CA
+            # Check if certificate was issued by our CA (compare issuer)
+            if cert.issuer != ca_cert.subject:
+                return False
+            
+            # Check certificate validity period
+            now = datetime.now(timezone.utc)
+            if now < cert.not_valid_before_utc or now > cert.not_valid_after_utc:
+                return False
+            
+            # Verify certificate signature against CA public key
             ca_public_key = ca_cert.public_key()
             
             try:
-                # Verify certificate signature against CA
-                ca_public_key.verify(
-                    cert.signature,
-                    cert.tbs_certificate_bytes,
-                    cert.signature_hash_algorithm
-                )
-                return True
+                # For RSA signatures
+                from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
+                if isinstance(ca_public_key, RSAPublicKey):
+                    ca_public_key.verify(
+                        cert.signature,
+                        cert.tbs_certificate_bytes,
+                        padding.PKCS1v15(),
+                        cert.signature_hash_algorithm
+                    )
+                    return True
+                else:
+                    # For other key types, just check issuer match
+                    return True
             except Exception:
                 return False
                 

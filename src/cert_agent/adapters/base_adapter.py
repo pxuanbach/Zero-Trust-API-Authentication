@@ -59,10 +59,6 @@ class CertificateAdapterFactory:
             from .internal_ca_adapter import InternalCAAdapter
             return InternalCAAdapter(config)
         
-        elif adapter_type.lower() == "letsencrypt":
-            from .letsencrypt_adapter import LetsEncryptAdapter
-            return LetsEncryptAdapter(config)
-        
         else:
             raise ValueError(f"Unsupported certificate adapter type: {adapter_type}")
     
