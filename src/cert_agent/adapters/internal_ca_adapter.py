@@ -3,6 +3,7 @@ Internal CA adapter for self-signed certificates
 """
 import os
 import tempfile
+import logging
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone, timedelta
 from cryptography import x509
@@ -13,6 +14,9 @@ from cryptography.hazmat.primitives.asymmetric import padding
 
 from .base_adapter import BaseCertificateAdapter
 from ...shared.models import CertificateRequest, CertificateResponse, CertificateInfo, CertificateStatus
+from ..crypto_utils import CryptoAlgorithm
+
+logger = logging.getLogger(__name__)
 
 
 class InternalCAAdapter(BaseCertificateAdapter):
@@ -25,6 +29,33 @@ class InternalCAAdapter(BaseCertificateAdapter):
         self.ca_cert_path = self.config.get("ca_cert_path", "ca/ca.crt")
         self.ca_key_path = self.config.get("ca_key_path", "ca/ca.key")
         self.cert_storage_path = self.config.get("cert_storage_path", "certs/")
+        
+        # Algorithm configuration
+        self.cert_algorithm = self.config.get("certificate_algorithm", "ECDSA_P256")
+        self.token_algorithm = self.config.get("token_algorithm", "ES256")
+        self.hash_algorithm = self.config.get("hash_algorithm", "SHA256")
+        self.rsa_key_size = self.config.get("rsa_key_size", 2048)
+        self.cert_validity_days = self.config.get("certificate_validity_days", 90)
+        
+        # Validate algorithm compatibility
+        if not CryptoAlgorithm.validate_algorithm_compatibility(
+            self.cert_algorithm, 
+            self.token_algorithm
+        ):
+            raise ValueError(
+                f"Incompatible algorithms: "
+                f"certificate={self.cert_algorithm}, "
+                f"token={self.token_algorithm}"
+            )
+        
+        logger.info(
+            f"InternalCAAdapter initialized with "
+            f"cert_algorithm={self.cert_algorithm}, "
+            f"token_algorithm={self.token_algorithm}, "
+            f"hash_algorithm={self.hash_algorithm}, "
+            f"rsa_key_size={self.rsa_key_size}, "
+            f"validity_days={self.cert_validity_days}"
+        )
         
         # In-memory certificate storage (for demo purposes)
         self.certificates: Dict[str, Dict[str, Any]] = {}
@@ -42,10 +73,12 @@ class InternalCAAdapter(BaseCertificateAdapter):
     
     def _create_ca(self):
         """Create a new CA certificate and private key"""
-        # Generate CA private key
-        ca_private_key = rsa.generate_private_key(
-            public_exponent=65537,
-            key_size=4096
+        logger.info(f"Creating CA certificate with algorithm: {self.cert_algorithm}")
+        
+        # Generate CA private key based on configured algorithm
+        ca_private_key = CryptoAlgorithm.generate_private_key(
+            self.cert_algorithm,
+            self.rsa_key_size
         )
         
         # Create CA certificate
@@ -57,7 +90,7 @@ class InternalCAAdapter(BaseCertificateAdapter):
             x509.NameAttribute(NameOID.COMMON_NAME, "Zero Trust Root CA"),
         ])
         
-        ca_cert = x509.CertificateBuilder().subject_name(
+        ca_cert_builder = x509.CertificateBuilder().subject_name(
             subject
         ).issuer_name(
             issuer
@@ -91,7 +124,15 @@ class InternalCAAdapter(BaseCertificateAdapter):
                 decipher_only=False
             ),
             critical=True,
-        ).sign(ca_private_key, hashes.SHA256())
+        )
+        
+        # Sign certificate with configured hash algorithm
+        hash_algo = CryptoAlgorithm.get_hash_algorithm(self.cert_algorithm, self.hash_algorithm)
+        if hash_algo:
+            ca_cert = ca_cert_builder.sign(ca_private_key, hash_algo)
+        else:
+            # For Ed25519, no hash algorithm needed
+            ca_cert = ca_cert_builder.sign(ca_private_key, None)
         
         # Save CA certificate and key
         os.makedirs(os.path.dirname(self.ca_cert_path), exist_ok=True)
@@ -120,13 +161,18 @@ class InternalCAAdapter(BaseCertificateAdapter):
     async def issue_certificate(self, request: CertificateRequest) -> CertificateResponse:
         """Issue a new certificate using internal CA"""
         try:
+            logger.info(
+                f"Issuing certificate for {request.common_name} "
+                f"with algorithm: {self.cert_algorithm}"
+            )
+            
             # Load CA
             ca_cert, ca_private_key = self._load_ca()
             
-            # Generate client private key
-            private_key = rsa.generate_private_key(
-                public_exponent=65537,
-                key_size=request.key_size
+            # Generate client private key based on configured algorithm
+            private_key = CryptoAlgorithm.generate_private_key(
+                self.cert_algorithm,
+                self.rsa_key_size
             )
             
             # Create certificate subject
@@ -146,6 +192,9 @@ class InternalCAAdapter(BaseCertificateAdapter):
             
             subject = x509.Name(subject_components)
             
+            # Use configured validity days instead of request.validity_days
+            validity_days = self.cert_validity_days
+            
             # Create certificate
             builder = x509.CertificateBuilder().subject_name(
                 subject
@@ -158,7 +207,7 @@ class InternalCAAdapter(BaseCertificateAdapter):
             ).not_valid_before(
                 datetime.now(timezone.utc)
             ).not_valid_after(
-                datetime.now(timezone.utc) + timedelta(days=request.validity_days)
+                datetime.now(timezone.utc) + timedelta(days=validity_days)
             ).add_extension(
                 x509.SubjectKeyIdentifier.from_public_key(private_key.public_key()),
                 critical=False,
@@ -191,8 +240,13 @@ class InternalCAAdapter(BaseCertificateAdapter):
                     critical=False
                 )
             
-            # Sign certificate
-            cert = builder.sign(ca_private_key, hashes.SHA256())
+            # Sign certificate with configured hash algorithm
+            hash_algo = CryptoAlgorithm.get_hash_algorithm(self.cert_algorithm, self.hash_algorithm)
+            if hash_algo:
+                cert = builder.sign(ca_private_key, hash_algo)
+            else:
+                # For Ed25519, no hash algorithm needed
+                cert = builder.sign(ca_private_key, None)
             
             # Convert to PEM format
             cert_pem = cert.public_bytes(serialization.Encoding.PEM).decode()

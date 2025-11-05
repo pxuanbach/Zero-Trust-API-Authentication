@@ -63,6 +63,11 @@ def certificate_agent():
         "ca_cert_path": settings.CA_CERT_PATH,
         "ca_key_path": settings.CA_KEY_PATH,
         "cert_storage_path": settings.CERT_STORAGE_PATH,
+        "certificate_algorithm": settings.CERTIFICATE_ALGORITHM,
+        "token_algorithm": settings.TOKEN_ALGORITHM,
+        "hash_algorithm": settings.HASH_ALGORITHM,
+        "rsa_key_size": settings.RSA_KEY_SIZE,
+        "certificate_validity_days": settings.CERTIFICATE_VALIDITY_DAYS,
     }
     agent.cert_provider = CertificateAdapterFactory.create_adapter("internal", adapter_config)
     
