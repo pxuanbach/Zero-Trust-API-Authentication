@@ -1,0 +1,80 @@
+include:
+  - dbs.yml
+  - keycloak.yml
+  - services.yml
+
+x-apisix-config: &apisix-env
+  APISIX_STAND_ALONE: "false"
+
+services:
+  #region Databases
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.9
+    container_name: apisix-etcd
+    environment:
+      ETCD_ENABLE_V2: "true"
+      ETCD_ADVERTISE_CLIENT_URLS: "http://etcd:2379"
+      ETCD_LISTEN_CLIENT_URLS: "http://0.0.0.0:2379"
+    volumes:
+      - etcd_data:/bitnami/etcd
+    networks:
+      - aaa-network
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  #endregion
+
+  #region API Gateway
+  # APISIX Gateway
+  apisix:
+    image: ${GW_IMAGE:-apache/apisix:3.7.0-debian}
+    container_name: apisix-gateway
+    restart: on-failure
+    environment:
+      <<: *apisix-env                 # Reuse environment config from x-apisix-config
+    volumes:
+      - ./apisix/config.yaml:/usr/local/apisix/conf/config.yaml:ro
+    ports:
+      - "9080:9080"  # Gateway HTTP
+      - "9443:9443"  # Gateway HTTPS
+      - "9180:9180"  # Admin API
+    depends_on:
+      etcd:
+        condition: service_healthy
+    networks:
+      - aaa-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9080/apisix/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # APISIX Dashboard
+  apisix-dashboard:
+    image: apache/apisix-dashboard:3.0.0-alpine
+    container_name: apisix-dashboard
+    restart: on-failure
+    volumes:
+      - ./apisix/dashboard-conf.yaml:/usr/local/apisix-dashboard/conf/conf.yaml:ro
+    ports:
+      - "9000:9000"  # Dashboard UI
+    depends_on:
+      apisix:
+        condition: service_started
+    networks:
+      - aaa-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9000"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  #endregion
+
+networks:
+  aaa-network:
+    driver: bridge
+
+volumes:
+  etcd_data:

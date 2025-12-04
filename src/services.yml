@@ -1,0 +1,46 @@
+services:
+  # FastAPI Service A
+  service-a:
+    build:
+      context: ./services/service-a
+      dockerfile: Dockerfile
+    container_name: service-a
+    environment:
+      SERVICE_NAME: service-a
+      SERVICE_B_URL: http://service-b:8001
+      KEYCLOAK_URL: http://keycloak:8080
+      REALM: zero-trust
+      CLIENT_ID: test-client
+    ports:
+      - "8003:8000"
+    networks:
+      - aaa-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      keycloak:
+        condition: service_healthy
+
+  # FastAPI Service B
+  service-b:
+    build:
+      context: ./services/service-b
+      dockerfile: Dockerfile
+    container_name: service-b
+    environment:
+      SERVICE_NAME: service-b
+    ports:
+      - "8004:8001"
+    networks:
+      - aaa-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      keycloak:
+        condition: service_healthy

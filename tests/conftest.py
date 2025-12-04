@@ -1,99 +1,49 @@
-"""
-Pytest configuration and shared fixtures
-"""
-import os
-import shutil
-from pathlib import Path
 import pytest
-from fastapi.testclient import TestClient
+import requests
+import os
+from tests.constants import (
+    KEYCLOAK_URL, REALM, CLIENT_ID, CLIENT_SECRET, 
+    USERNAME, PASSWORD, SERVICE_A_URL, SERVICE_B_URL,
+    APISIX_ADMIN_URL, APISIX_ADMIN_KEY, APISIX_GATEWAY_URL
+)
 
-from src.cert_agent.main import CertificateAgent
-
-
-@pytest.fixture(scope="session", autouse=True)
-def setup_test_environment():
-    """Setup test environment and clean up after all tests"""
-    # Set test certificate storage path BEFORE importing config
-    os.environ["CERT_AGENT_CERT_STORAGE_PATH"] = "certs_test/"
-    
-    # Reload config to pick up test environment variables
-    from src.cert_agent.config import reload_settings
-    reload_settings()
-    
-    # Create test certs directory if it doesn't exist
-    test_certs_dir = Path("certs_test")
-    test_certs_dir.mkdir(exist_ok=True)
-    
-    yield
-    
-    # Clean up test certificates after all tests
-    if test_certs_dir.exists():
-        shutil.rmtree(test_certs_dir)
-
-
-@pytest.fixture(autouse=True)
-def clear_test_certs():
-    """Clear test certificates before each test"""
-    test_certs_dir = Path("certs_test")
-    if test_certs_dir.exists():
-        # Remove all files in the directory
-        for item in test_certs_dir.iterdir():
-            if item.is_file():
-                item.unlink()
-            elif item.is_dir():
-                shutil.rmtree(item)
-    else:
-        test_certs_dir.mkdir(exist_ok=True)
-    
-    yield
-
-
-@pytest.fixture
-def certificate_agent():
-    """Create CertificateAgent instance with real internal CA adapter"""
-    # Ensure config is reloaded with test environment variables
-    from src.cert_agent.config import reload_settings, get_settings
-    settings = reload_settings()
-    
-    agent = CertificateAgent(adapter_type="internal")
-    
-    # Initialize the provider manually with test config (bypass lifespan)
-    from src.cert_agent.adapters.base_adapter import CertificateAdapterFactory
-    adapter_config = {
-        "ca_cert_path": settings.CA_CERT_PATH,
-        "ca_key_path": settings.CA_KEY_PATH,
-        "cert_storage_path": settings.CERT_STORAGE_PATH,
-        "certificate_algorithm": settings.CERTIFICATE_ALGORITHM,
-        "token_algorithm": settings.TOKEN_ALGORITHM,
-        "hash_algorithm": settings.HASH_ALGORITHM,
-        "rsa_key_size": settings.RSA_KEY_SIZE,
-        "certificate_validity_days": settings.CERTIFICATE_VALIDITY_DAYS,
-    }
-    agent.cert_provider = CertificateAdapterFactory.create_adapter("internal", adapter_config)
-    
-    yield agent
-
-
-@pytest.fixture
-def client(certificate_agent):
-    """TestClient for making HTTP requests"""
-    return TestClient(certificate_agent.app)
-
-
-@pytest.fixture
-def sample_cert_request():
-    """Sample certificate request"""
+@pytest.fixture(scope="session")
+def settings():
+    """Global settings for the test suite."""
     return {
-        "common_name": "test.example.com",
-        "organization": "Test Org",
-        "country": "US",
-        "san_list": ["test.example.com", "www.test.example.com"],
-        "key_size": 2048,
-        "validity_days": 365
+        KEYCLOAK_URL: os.getenv("KEYCLOAK_URL", "http://localhost:8080"),
+        REALM: "zero-trust",
+        CLIENT_ID: "test-client",
+        CLIENT_SECRET: "test-client-secret",
+        USERNAME: "testuser",
+        PASSWORD: "testpassword123",
+        SERVICE_A_URL: os.getenv("SERVICE_A_URL", "http://localhost:8003"),
+        SERVICE_B_URL: os.getenv("SERVICE_B_URL", "http://localhost:8004"),
+        APISIX_ADMIN_URL: os.getenv("APISIX_ADMIN_URL", "http://localhost:9180"),
+        APISIX_ADMIN_KEY: os.getenv("APISIX_ADMIN_KEY", "edd1c9f034335f136f87ad84b625c8f1"),
+        APISIX_GATEWAY_URL: os.getenv("APISIX_GATEWAY_URL", "http://localhost:9080"),
     }
 
+@pytest.fixture(scope="session")
+def auth_token(settings):
+    """Authenticate with Keycloak and return access token (session scoped)."""
+    token_url = f"{settings[KEYCLOAK_URL]}/realms/{settings[REALM]}/protocol/openid-connect/token"
+    payload = {
+        "client_id": settings[CLIENT_ID],
+        "client_secret": settings[CLIENT_SECRET],
+        "username": settings[USERNAME],
+        "password": settings[PASSWORD],
+        "grant_type": "password"
+    }
+    
+    try:
+        response = requests.post(token_url, data=payload)
+        response.raise_for_status()
+        return response.json()["access_token"]
+    except requests.exceptions.RequestException as e:
+        pytest.fail(f"Authentication failed: {e}")
 
-@pytest.fixture
-def sample_certificate_pem():
-    """Sample certificate PEM"""
-    return "-----BEGIN CERTIFICATE-----\nMOCK_CERT_DATA\n-----END CERTIFICATE-----"
+@pytest.fixture(scope="session")
+def auth_headers(auth_token):
+    """Return headers with Bearer token."""
+    return {"Authorization": f"Bearer {auth_token}"}
