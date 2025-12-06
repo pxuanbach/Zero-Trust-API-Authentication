@@ -125,8 +125,6 @@ Xem chi tiết tại: [Authentication Flow](./diagram/Propose4_Authentication_Fl
 
 ## 4. Phân tích Mô hình đe dọa
 
-Xem chi tiết tại: [Threat Model](./diagram/Propose4_Threat_Model.md)
-
 Kiến trúc này giúp giảm thiểu các rủi ro sau:
 
 *   **Giả mạo dịch vụ (Service Spoofing):** Kẻ tấn công không thể giả mạo một service nội bộ vì không có chứng chỉ hợp lệ được cấp bởi Local CA.

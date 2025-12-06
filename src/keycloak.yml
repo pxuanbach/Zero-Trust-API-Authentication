@@ -23,7 +23,7 @@ services:
     volumes:
       - ./keycloak/realm-config.json:/opt/keycloak/data/import/realm-config.json
     depends_on:
-      postgres-keycloak:
+      postgres:
         condition: service_healthy
     networks:
       - aaa-network

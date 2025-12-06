@@ -62,8 +62,9 @@ Service B (Port 8004)
 ## Directory Structure
 
 ```
+docker-compose.yml              # Main Docker Compose configuration
 src/
-├── docker-compose.yml          # Main Docker Compose configuration
+├── apisix.yml                  # APISIX services configuration
 ├── dbs.yml                     # Database services configuration
 ├── keycloak.yml                # Keycloak service configuration
 ├── services.yml                # Application services configuration
@@ -81,22 +82,7 @@ src/
         ├── Dockerfile
         ├── main.py
         └── requirements.txt
-
-scripts/
-├── get-token.ps1               # Script to get JWT token
-├── get-token.sh                # Script to get JWT token (Linux/Mac)
-├── test-infrastructure.ps1     # Script to test the entire system
-└── test-infrastructure.sh      # Script to test the entire system (Linux/Mac)
 ```
-
-## Next Steps
-
-To implement mTLS for internal communication between services:
-
-1. Create Local CA with OpenSSL (see `/ca` folder)
-2. Issue certificates for Service A and Service B
-3. Configure FastAPI to require and validate client certificates
-4. Update docker-compose to mount certificates into containers
 
 ## References
 
