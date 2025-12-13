@@ -7,7 +7,7 @@ import os
 app = FastAPI(title="Service A")
 
 SERVICE_NAME = os.getenv("SERVICE_NAME", "service-a")
-SERVICE_B_URL = os.getenv("SERVICE_B_URL", "http://service-b:8001")
+SERVICE_B_URL = os.getenv("SERVICE_B_URL", "https://service-b:8001")
 KEYCLOAK_URL = os.getenv("KEYCLOAK_URL", "http://keycloak:8080")
 REALM = os.getenv("REALM", "zero-trust")
 
@@ -76,7 +76,13 @@ async def call_service_b(user: Dict[str, Any] = Depends(get_current_user)):
     This demonstrates internal service-to-service communication
     """
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(
+                verify="/certs/ca/ca.crt",
+                cert=(
+                    "/certs/service-a/service-a.crt",
+                    "/certs/service-a/service-a.key"
+                )
+            ) as client:
             response = await client.get(
                 f"{SERVICE_B_URL}/data",
                 timeout=10.0

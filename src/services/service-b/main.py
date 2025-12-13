@@ -48,4 +48,13 @@ async def process_data(payload: dict):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=8001,
+        ssl_certfile="/certs/service-b/service-b.crt",
+        ssl_keyfile="/certs/service-b/service-b.key",
+        ssl_ca_certs="/certs/ca/ca.crt",
+        ssl_cert_reqs=2,  # CERT_REQUIRED
+    )
+

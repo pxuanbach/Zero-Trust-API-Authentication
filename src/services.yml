@@ -7,7 +7,7 @@ services:
     container_name: service-a
     environment:
       SERVICE_NAME: service-a
-      SERVICE_B_URL: http://service-b:8001
+      SERVICE_B_URL: https://service-b:8001
       KEYCLOAK_URL: http://keycloak:8080
       REALM: zero-trust
       CLIENT_ID: test-client
@@ -23,6 +23,8 @@ services:
     depends_on:
       keycloak:
         condition: service_healthy
+    volumes:
+      - ./certs:/certs:ro
 
   # FastAPI Service B
   service-b:
@@ -44,3 +46,5 @@ services:
     depends_on:
       keycloak:
         condition: service_healthy
+    volumes:
+      - ./certs:/certs:ro
