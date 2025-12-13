@@ -33,9 +33,61 @@
       "standardFlowEnabled": true,
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": true,
-      "serviceAccountsEnabled": false,
-      "authorizationServicesEnabled": false,
-      "fullScopeAllowed": true
+      "serviceAccountsEnabled": true,
+      "authorizationServicesEnabled": true,
+      "fullScopeAllowed": true,
+      "authorizationSettings": {
+        "allowRemoteResourceManagement": true,
+        "policyEnforcementMode": "ENFORCING",
+        "resources": [
+          {
+            "name": "Service A Resource",
+            "type": "urn:service-a:resources:api",
+            "ownerManagedAccess": false,
+            "uris": ["/protected", "/call-b"],
+            "scopes": [
+              {"name": "read"},
+              {"name": "write"}
+            ]
+          },
+          {
+            "name": "Service B Resource",
+            "type": "urn:service-b:resources:api",
+            "ownerManagedAccess": false,
+            "uris": ["/data", "/process"],
+            "scopes": [
+              {"name": "read"},
+              {"name": "write"}
+            ]
+          }
+        ],
+        "policies": [
+          {
+            "name": "Admin Only Policy",
+            "description": "Only admin role can access",
+            "type": "role",
+            "logic": "POSITIVE",
+            "decisionStrategy": "UNANIMOUS",
+            "config": {
+              "roles": "[{\"id\":\"admin\",\"required\":true}]"
+            }
+          },
+          {
+            "name": "User Read Policy",
+            "description": "Users can read resources",
+            "type": "role",
+            "logic": "POSITIVE",
+            "decisionStrategy": "UNANIMOUS",
+            "config": {
+              "roles": "[{\"id\":\"user\",\"required\":true}]"
+            }
+          }
+        ],
+        "scopes": [
+          {"name": "read"},
+          {"name": "write"}
+        ]
+      }
     }
   ],
   "users": [
@@ -106,5 +158,21 @@
   "clientScopeMappings": {},
   "defaultRoles": [
     "user"
-  ]
+  ],
+  "eventsEnabled": true,
+  "eventsExpiration": 259200,
+  "eventsListeners": ["jboss-logging"],
+  "enabledEventTypes": [
+    "LOGIN",
+    "LOGIN_ERROR",
+    "LOGOUT",
+    "CODE_TO_TOKEN",
+    "CODE_TO_TOKEN_ERROR",
+    "REFRESH_TOKEN",
+    "REFRESH_TOKEN_ERROR",
+    "INTROSPECT_TOKEN",
+    "INTROSPECT_TOKEN_ERROR"
+  ],
+  "adminEventsEnabled": true,
+  "adminEventsDetailsEnabled": true
 }

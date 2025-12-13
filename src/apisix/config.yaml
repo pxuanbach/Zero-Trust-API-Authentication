@@ -30,12 +30,20 @@ deployment:
 nginx_config:
   error_log: "/dev/stderr"
   error_log_level: "warn"
+  http:
+    access_log: "/usr/local/apisix/logs/access.log"
+    access_log_format: '$remote_addr - $remote_user [$time_local] "$request" $status $body_bytes_sent "$http_referer" "$http_user_agent" $request_time $upstream_response_time "$http_authorization"'
 
 plugin_attr:
   prometheus:
     export_addr:
       ip: "0.0.0.0"
       port: 9091
+  
+  syslog:
+    max_retry_times: 3
+    retry_interval: 1
+    timeout: 3000
 
 plugins:
   - api-breaker
