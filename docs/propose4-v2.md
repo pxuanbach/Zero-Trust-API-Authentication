@@ -29,10 +29,10 @@ Hệ thống được thiết kế để phân tách rõ ràng giữa các ứng
 
 Việc xác định tài sản cần bảo vệ được phân chia theo từng góc nhìn cụ thể trong kiến trúc:
 
-*   **Góc nhìn Tổng thể:** Toàn bộ **Dữ liệu doanh nghiệp** và tính toàn vẹn của các **Services** bên trong hệ thống là tài sản tối thượng. Mục tiêu là ngăn chặn rò rỉ dữ liệu và gián đoạn dịch vụ.
-*   **Góc nhìn Vùng Biên (Edge Layer):** **Thông tin đăng nhập (Credentials)** và **Phiên làm việc (User Session/Token)** của người dùng là tài sản cần bảo vệ. Cần ngăn chặn các cuộc tấn công chiếm quyền tài khoản hoặc giả mạo phiên.
-*   **Góc nhìn Vùng Private Subnet (Extension Zone):** **Quyền truy cập vào từng Service** là tài sản. Một Extension App chỉ được phép hoạt động trong phạm vi chức năng của nó, không được phép gọi bừa bãi sang các App khác nếu không được cấp quyền.
-*   **Góc nhìn Vùng Lõi (Core Zone):** **Quyền truy cập và Dữ liệu của Core CRM** là tài sản quan trọng nhất. Đây là "trái tim" của hệ thống, chỉ chấp nhận các kết nối đã được xác thực tuyệt đối (qua mTLS) từ các nguồn tin cậy.
+*   **Tổng thể:** Toàn bộ **Dữ liệu doanh nghiệp** và tính toàn vẹn của các **Services** bên trong hệ thống là tài sản tối thượng. Mục tiêu là ngăn chặn rò rỉ dữ liệu và gián đoạn dịch vụ.
+*   **Bảo mật ở Vùng Biên (Edge Layer):** **Thông tin đăng nhập (Credentials)** và **Phiên làm việc (User Session/Token)** của người dùng là tài sản cần bảo vệ. Cần ngăn chặn các cuộc tấn công chiếm quyền tài khoản hoặc giả mạo phiên.
+*   **Bảo mật ở Vùng Private Subnet (Extension Zone):** **Quyền truy cập vào từng Service** là tài sản. Một Extension App chỉ được phép hoạt động trong phạm vi chức năng của nó, không được phép gọi bừa bãi sang các App khác nếu không được cấp quyền.
+*   **Bảo mật ở Vùng Lõi (Core Zone):** **Quyền truy cập và Dữ liệu của Core CRM** là tài sản quan trọng nhất. Đây là "trái tim" của hệ thống, chỉ chấp nhận các kết nối đã được xác thực tuyệt đối (qua mTLS) từ các nguồn tin cậy.
 
 ### 2.3. Sơ đồ kiến trúc
 

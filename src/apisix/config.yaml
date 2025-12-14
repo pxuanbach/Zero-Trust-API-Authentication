@@ -11,6 +11,11 @@ deployment:
   role: traditional
   role_traditional:
     config_provider: etcd
+  etcd:
+    host:
+      - "http://etcd:2379"
+    prefix: "/apisix"
+    timeout: 30
 
   admin:
     admin_key:
@@ -20,12 +25,6 @@ deployment:
     enable_admin_cors: true
     allow_admin:
       - 0.0.0.0/0
-
-  etcd:
-    host:
-      - "http://etcd:2379"
-    prefix: "/apisix"
-    timeout: 30
 
 nginx_config:
   error_log: "/dev/stderr"
@@ -39,51 +38,17 @@ plugin_attr:
     export_addr:
       ip: "0.0.0.0"
       port: 9091
-  
-  syslog:
-    max_retry_times: 3
-    retry_interval: 1
-    timeout: 3000
 
 plugins:
-  - api-breaker
-  - authz-keycloak
-  - basic-auth
-  - batch-requests
-  - consumer-restriction
-  - cors
-  - echo
-  - fault-injection
-  - grpc-transcode
-  - grpc-web
-  - hmac-auth
-  - http-logger
-  - ip-restriction
-  - jwt-auth
-  - kafka-logger
-  - key-auth
-  - limit-conn
-  - limit-count
-  - limit-req
-  - node-status
-  - openid-connect
-  - prometheus
-  - proxy-cache
-  - proxy-mirror
-  - proxy-rewrite
-  - redirect
-  - referer-restriction
-  - request-id
-  - request-validation
-  - response-rewrite
-  - serverless-post-function
-  - serverless-pre-function
-  - sls-logger
-  - syslog
-  - tcp-logger
-  - udp-logger
-  - uri-blocker
-  - wolf-rbac
-  - zipkin
-  - server-info
-  - traffic-split
+  - cors              
+  - openid-connect    # Integrate AAA Server (Keycloak)
+  - limit-req         # Rate Limiting
+  - limit-count       # Rate Limiting
+  - request-id        
+  - http-logger       
+  - prometheus        # Monitoring
+  - proxy-rewrite     # Routing
+  - response-rewrite  # Response modification
+  - fault-injection   
+  - ip-restriction    
+  - server-info       # Dashboard info

@@ -4,8 +4,6 @@ services:
     image: ${GW_IMAGE:-apache/apisix:3.7.0-debian}
     container_name: apisix-gateway
     restart: on-failure
-    environment:
-      APISIX_STAND_ALONE: "false"
     volumes:
       - ./apisix/config.yaml:/usr/local/apisix/conf/config.yaml:ro
     ports:
@@ -22,6 +20,20 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  apisix-config-loader:
+    image: python:3.11-slim
+    container_name: apisix-config-loader
+    volumes:
+      - ./apisix/init_routes.py:/app/init_routes.py:ro
+      - ./certs:/certs:ro
+    command: >
+      sh -c "pip install requests && python /app/init_routes.py"
+    depends_on:
+      apisix:
+        condition: service_healthy
+    networks:
+      - aaa-network
 
   apisix-dashboard:
     image: apache/apisix-dashboard:3.0.0-alpine

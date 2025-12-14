@@ -1,50 +1,48 @@
 services:
-  # FastAPI Service A
-  service-a:
+  extension-app1:
     build:
-      context: ./services/service-a
+      context: ./services/extension-app1
       dockerfile: Dockerfile
-    container_name: service-a
+    container_name: extension-app1
     environment:
-      SERVICE_NAME: service-a
-      SERVICE_B_URL: https://service-b:8001
-      KEYCLOAK_URL: http://keycloak:8080
-      REALM: zero-trust
-      CLIENT_ID: test-client
+      SERVICE_NAME: extension-app1
+      CRM_APP_URL: https://crm-app:8001
+      CERT_DIR: /app/certs
+      SERVER_CERT: /app/certs/extension-app1/service-a.crt
+      SERVER_KEY: /app/certs/extension-app1/service-a.key
+      CA_CERT: /app/certs/ca/ca.crt
     ports:
       - "8003:8000"
     networks:
       - aaa-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      # Health check needs to use HTTPS now
+      test: ["CMD", "curl", "-k", "-f", "https://localhost:8000/health"]
       interval: 10s
       timeout: 5s
       retries: 3
-    depends_on:
-      keycloak:
-        condition: service_healthy
     volumes:
-      - ./certs:/certs:ro
+      - ./certs:/app/certs:ro
 
-  # FastAPI Service B
-  service-b:
+  crm-app:
     build:
-      context: ./services/service-b
+      context: ./services/crm-app
       dockerfile: Dockerfile
-    container_name: service-b
+    container_name: crm-app
     environment:
-      SERVICE_NAME: service-b
+      SERVICE_NAME: crm-app
+      CERT_DIR: /app/certs
+      SERVER_CERT: /app/certs/crm-app/service-b.crt
+      SERVER_KEY: /app/certs/crm-app/service-b.key
+      CA_CERT: /app/certs/ca/ca.crt
     ports:
       - "8004:8001"
     networks:
       - aaa-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      test: ["CMD", "curl", "-k", "-f", "https://localhost:8001/health"]
       interval: 10s
       timeout: 5s
       retries: 3
-    depends_on:
-      keycloak:
-        condition: service_healthy
     volumes:
-      - ./certs:/certs:ro
+      - ./certs:/app/certs:ro
