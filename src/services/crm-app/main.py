@@ -69,6 +69,17 @@ async def get_data(
         "message": "Data retrieved successfully via mTLS"
     }
 
+@app.delete("/data/{record_id}")
+async def delete_data(record_id: int):
+    """
+    Endpoint to simulate data deletion.
+    Only accessible by Admin (enforced by Gateway).
+    """
+    return {
+        "message": f"Record {record_id} deleted successfully",
+        "status": "deleted"
+    }
+
 if __name__ == "__main__":
     uvicorn.run(
         "main:app",

@@ -42,6 +42,7 @@ plugin_attr:
 plugins:
   - cors              
   - openid-connect    # Integrate AAA Server (Keycloak)
+  - authz-keycloak    # Keycloak Authorization
   - limit-req         # Rate Limiting
   - limit-count       # Rate Limiting
   - request-id        

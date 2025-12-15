@@ -43,48 +43,50 @@ Việc xác định tài sản cần bảo vệ được phân chia theo từng 
 <summary>Code snippet</summary>
 
 ```mermaid
-graph TD
-    subgraph "Public Internet"
-        Client[Client Browser]
-    end
-
-    subgraph "AWS VPC"
-        subgraph "Public Subnet (Edge Layer)"
-            ALB[AWS ALB]
-        end
-
-        subgraph "Private Subnet (App Layer)"
-            APISIX[APISIX Gateway <br/> User AuthN via JWT]
-            Keycloak[Keycloak <br/> AAA Server]
-            
-            subgraph ExtensionApps["Extension Apps"]
-                ServiceA1[App 1]
-                ServiceA2[App ...]
-                ServiceAN[App n]
-            end
-
-            ServiceB[Core CRM App]
-
-            LocalCA[Local CA / Secrets Manager]
-        end
-    end
-
-    Client -->|HTTPS| ALB
+---
+config:
+  flowchart:
+    curve: stepBefore
+  themeVariables:
+    fontSize: 20px
+  layout: elk
+---
+flowchart LR
+ subgraph subGraph0["Public Internet"]
+        Client["Client Browser"]
+  end
+ subgraph subGraph1["Public Subnet (Edge Layer)"]
+        ALB["AWS ALB"]
+  end
+ subgraph ExtensionApps["Extension Apps"]
+        ServiceA1["App 1"]
+        ServiceA2["App ..."]
+        ServiceAN["App n"]
+  end
+ subgraph subGraph3["Private Subnet (App Layer)"]
+        APISIX["APISIX Gateway <br> User AuthN via JWT"]
+        Keycloak["Keycloak <br> AAA Server"]
+        ExtensionApps
+        ServiceB["Core CRM App"]
+        LocalCA["Local CA <br> Secrets Manager"]
+  end
+ subgraph subGraph4["AWS VPC"]
+    direction LR
+        subGraph1
+        subGraph3
+  end
+    Client -- HTTPS --> ALB
     ALB --> APISIX
-    
-    APISIX -- "Validate JWT (User Auth)" --> Keycloak
-    
-    APISIX -- "mTLS" --> ServiceA1
-    APISIX -- "mTLS" --> ServiceA2
-    APISIX -- "mTLS" --> ServiceAN
-    ExtensionApps -- "mTLS" --> ServiceB
-
-
-    ExtensionApps -.->|Request Cert| LocalCA
-    ServiceB -.->|Request Cert| LocalCA
+    APISIX -- Validate JWT --> Keycloak
+    APISIX -- mTLS --> ExtensionApps
+    ExtensionApps -- mTLS --> ServiceB
+    ExtensionApps -. Request Cert .-> LocalCA
+    ServiceB -. Request Cert .-> LocalCA
+    APISIX -. Request Cert .-> LocalCA
 
     style APISIX fill:#f96,stroke:#333,stroke-width:2px
     style ServiceB fill:#f9f,stroke:#333,stroke-width:2px
+    style subGraph4 color:#FF6D00,stroke:#FF6D00
 ```
 
 </details>
@@ -98,13 +100,13 @@ graph TD
     *   **Vai trò:** Gateway nhận request từ Client.
     *   **Tính năng:**
         *   Xác thực JWT của User (tích hợp Keycloak).
-        *   **mTLS Client:** Cấu hình chứng chỉ Client (Gateway Cert) để xác thực chính nó khi gọi vào Service A.
+        *   **mTLS Client:** Cấu hình chứng chỉ Client để xác thực chính nó khi gọi vào Service A.
 
 *   **AAA Server: Keycloak**
-    *   **Vai trò:** Chỉ đóng vai trò xác thực người dùng (End-user) ở lớp biên. **Không** tham gia vào quá trình xác thực giữa các service nội bộ (Service-to-Service).
+    *   **Vai trò:** Đóng vai trò xác thực (authentication), ủy quyền (authorization) người dùng và kiểm toán (accounting) ở lớp biên.
 
 *   **Internal Security: mTLS & Local CA**
-    *   **Vai trò:** Cơ chế xác thực và ủy quyền duy nhất trong mạng nội bộ (Private Subnet).
+    *   **Vai trò:** Cơ chế xác thực và ủy quyền duy nhất trong mạng nội bộ.
     *   **Local CA:** Cấp phát chứng chỉ cho APISIX, Extension Apps và Core CRM App.
     *   **Core CRM App:** Sử dụng mTLS để định danh Extension App. Nếu Extension App có chứng chỉ hợp lệ, Core CRM App cho phép truy cập (Authorization dựa trên Identity của Service).
 
@@ -153,15 +155,50 @@ Luồng giao tiếp trong mạng nội bộ (Private Subnet) tuân thủ nghiêm
 
 ## 5. Kiểm thử
 
+Hệ thống được kiểm thử toàn diện qua 3 nhóm test cases chính: **Authentication (Xác thực)**, **Authorization (Ủy quyền)**, và **Accounting (Kiểm toán)**, cùng với các kịch bản bảo mật để phá vỡ chuỗi tin cậy mTLS.
+
+### 5.1. Authentication Tests
+
+| ID | Tên kịch bản | Mô tả | Kết quả mong đợi |
+| :--- | :--- | :--- | :--- |
+| AUTH-1 | Valid User Login | User thường đăng nhập với username/password hợp lệ qua APISIX Gateway. | Keycloak trả về 200 OK với Access Token (JWT) hợp lệ. |
+| AUTH-2 | Valid Admin Login | User Admin đăng nhập với credentials hợp lệ qua APISIX Gateway. | Keycloak trả về 200 OK với Access Token cho Admin. |
+| AUTH-3 | Invalid User Login | User đăng nhập với password sai. | Keycloak trả về 401 Unauthorized, không cấp token. |
+
+### 5.2. Authorization Tests
+
+Các test cases kiểm tra cơ chế phân quyền dựa trên Keycloak Resource-Based Permissions:
+
+| ID | Tên kịch bản | Mô tả | Kết quả mong đợi |
+| :--- | :--- | :--- | :--- |
+| AUTHZ-1 | Normal User DELETE Denied | User thường thực hiện DELETE trên Extension App và CRM App. | APISIX authz-keycloak plugin trả về 403 Forbidden với error "access_denied". |
+| AUTHZ-2 | Admin User DELETE Allowed | User có role Admin thực hiện DELETE trên Extension App và CRM App. | Request được phép, backend trả về 200 OK với status "deleted". |
+| AUTHZ-3 | Normal User GET Allowed | User thường thực hiện GET request trên Extension App và CRM App. | Request được phép, backend trả về 200 OK với dữ liệu. |
+
+### 5.3. Accounting Tests (Kiểm toán hoạt động)
+
+Các test cases kiểm tra khả năng ghi nhận và truy vấn sự kiện từ Keycloak Events API:
+
+| ID | Tên kịch bản | Mô tả | Kết quả mong đợi |
+| :--- | :--- | :--- | :--- |
+| ACCT-1 | Login Event Recorded | User đăng nhập thành công qua Gateway. | Keycloak ghi nhận event LOGIN với thông tin user, client, IP address. |
+| ACCT-2 | Failed Login Recorded | User đăng nhập thất bại (sai password). | Keycloak ghi nhận event LOGIN_ERROR với error code "invalid_user_credentials". |
+| ACCT-3 | Token Refresh Recorded | User thực hiện refresh token. | Keycloak ghi nhận event REFRESH_TOKEN với client ID và user ID. |
+| ACCT-4 | Multiple Logins Tracked | User đăng nhập nhiều lần liên tiếp. | Keycloak ghi nhận từng event LOGIN riêng biệt theo thời gian. |
+| ACCT-5 | Token Introspection Logged | APISIX validate token qua introspection endpoint. | Keycloak ghi nhận event INTROSPECT_TOKEN khi Gateway kiểm tra token. |
+
+### 5.4. Security & mTLS Tests (Bảo mật nội bộ)
+
 Các kịch bản kiểm thử tập trung vào việc phá vỡ chuỗi tin cậy mTLS:
 
-| ID | Tên kịch bản (Scenario) | Mô tả | Kết quả mong đợi |
+| ID | Tên kịch bản | Mô tả | Kết quả mong đợi |
 | :--- | :--- | :--- | :--- |
 | SEC-01 | Gateway không Cert | APISIX gọi Extension App mà không có Client Cert. | Extension App từ chối kết nối (Handshake Failed). |
 | SEC-02 | App không Cert | Extension App gọi Core CRM App mà không có Client Cert. | Core CRM App từ chối kết nối. |
 | SEC-03 | Rogue Service | Một container lạ giả mạo Extension App gọi Core CRM App. | Core CRM App từ chối do Cert không được ký bởi Local CA. |
 | SEC-04 | Bypass Gateway | Client gọi trực tiếp IP của Extension App (bỏ qua APISIX). | Thất bại (do Extension App nằm trong Private Subnet và chỉ nhận mTLS). |
 
+
 ## 6. Kết luận
 
-Kiến trúc này đảm bảo sự cân bằng giữa tính linh hoạt (cho phép mở rộng tính năng qua Extension Apps) và tính bảo mật (bảo vệ Core CRM). Bằng cách loại bỏ sự phụ thuộc vào AAA Server trong mạng nội bộ và thay thế bằng **mTLS**, hệ thống giảm thiểu độ trễ, tăng hiệu năng, đồng thời thiết lập một hàng rào bảo vệ vững chắc theo mô hình Zero Trust: "Không tin tưởng bất kỳ ai, kể cả người trong nhà, trừ khi họ có giấy thông hành (Certificate) hợp lệ".
+Kiến trúc này đảm bảo sự cân bằng giữa tính linh hoạt (cho phép mở rộng tính năng qua Extension Apps) và tính bảo mật (bảo vệ Core CRM). Bằng cách dùng kỹ thuật **mTLS**, hệ thống đã thiết lập một hàng rào bảo vệ vững chắc theo mô hình Zero Trust: "Không tin tưởng bất kỳ ai, kể cả người trong nhà, trừ khi họ có giấy thông hành (Certificate) hợp lệ".

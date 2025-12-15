@@ -26,9 +26,10 @@ services:
     container_name: apisix-config-loader
     volumes:
       - ./apisix/init_routes.py:/app/init_routes.py:ro
+      - ./keycloak/setup_authz.py:/app/setup_authz.py:ro
       - ./certs:/certs:ro
     command: >
-      sh -c "pip install requests && python /app/init_routes.py"
+      sh -c "pip install requests && python /app/setup_authz.py && python /app/init_routes.py"
     depends_on:
       apisix:
         condition: service_healthy

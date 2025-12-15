@@ -87,6 +87,17 @@ async def call_crm(
     except ssl.SSLError as e:
         raise HTTPException(status_code=403, detail=f"mTLS Handshake Failed: {str(e)}")
 
+@app.delete("/resource/{resource_id}")
+async def delete_resource(resource_id: int):
+    """
+    Endpoint to simulate resource deletion.
+    Only accessible by Admin (enforced by Gateway).
+    """
+    return {
+        "message": f"Resource {resource_id} deleted successfully",
+        "status": "deleted"
+    }
+
 if __name__ == "__main__":
     # Run as HTTPS Server (mTLS Server)
     uvicorn.run(

@@ -63,7 +63,7 @@ def create_routes():
             "id": "1",
             "uri": "/api/v1/extension-app/*",
             "name": "extension-app-route",
-            "methods": ["GET", "POST", "PUT", "DELETE"],
+            "methods": ["GET", "POST", "PUT"],
             "plugins": {
                 **common_plugins,
                 "proxy-rewrite": {
@@ -85,9 +85,40 @@ def create_routes():
         },
         {
             "id": "2",
+            "uri": "/api/v1/extension-app/*",
+            "name": "extension-app-route-admin",
+            "methods": ["DELETE"],
+            "plugins": {
+                **common_plugins,
+                "proxy-rewrite": {
+                    "regex_uri": ["^/api/v1/extension-app/(.*)", "/$1"]
+                },
+                "authz-keycloak": {
+                    "token_endpoint": "http://keycloak:8080/realms/zero-trust/protocol/openid-connect/token",
+                    "client_id": "test-client",
+                    "client_secret": "test-client-secret",
+                    "policy_enforcement_mode": "ENFORCING",
+                    "permissions": ["Extension App Delete Resource"]
+                }
+            },
+            "upstream": {
+                "nodes": {
+                    "extension-app1:8000": 1
+                },
+                "type": "roundrobin",
+                "scheme": "https",
+                "tls": {
+                    "client_cert": cert_content,
+                    "client_key": key_content,
+                    "verify": True
+                }
+            }
+        },
+        {
+            "id": "3",
             "uri": "/api/v1/crm/*",
             "name": "crm-app-route",
-            "methods": ["GET", "POST", "PUT", "DELETE"],
+            "methods": ["GET", "POST", "PUT"],
             "plugins": {
                 **common_plugins,
                 "proxy-rewrite": {
@@ -105,6 +136,59 @@ def create_routes():
                     "client_key": key_content,
                     "verify": True
                 }
+            }
+        },
+        {
+            "id": "4",
+            "uri": "/api/v1/crm/*",
+            "name": "crm-app-route-admin",
+            "methods": ["DELETE"],
+            "plugins": {
+                **common_plugins,
+                "proxy-rewrite": {
+                    "regex_uri": ["^/api/v1/crm/(.*)", "/$1"]
+                },
+                "authz-keycloak": {
+                    "token_endpoint": "http://keycloak:8080/realms/zero-trust/protocol/openid-connect/token",
+                    "client_id": "test-client",
+                    "client_secret": "test-client-secret",
+                    "policy_enforcement_mode": "ENFORCING",
+                    "permissions": ["CRM App Delete Resource"]
+                }
+            },
+            "upstream": {
+                "nodes": {
+                    "crm-app:8001": 1
+                },
+                "type": "roundrobin",
+                "scheme": "https",
+                "tls": {
+                    "client_cert": cert_content,
+                    "client_key": key_content,
+                    "verify": True
+                }
+            }
+        },
+        {
+            "id": "5",
+            "uri": "/api/v1/auth/*",
+            "name": "auth-route",
+            "methods": ["GET", "POST"],
+            "plugins": {
+                "cors": {
+                    "allow_origins": "*",
+                    "allow_methods": "*",
+                    "allow_headers": "*"
+                },
+                "proxy-rewrite": {
+                    "regex_uri": ["^/api/v1/auth/(.*)", "/$1"]
+                }
+            },
+            "upstream": {
+                "nodes": {
+                    "keycloak:8080": 1
+                },
+                "type": "roundrobin"
             }
         }
     ]
