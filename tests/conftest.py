@@ -264,6 +264,105 @@ def init_apisix_routes(settings):
             print(f"Warning: Failed to delete route {route['name']}: {e}")
 
 @pytest.fixture(scope="session")
+def init_no_mtls_route(settings, init_apisix_routes):
+    """Initialize APISIX routes WITHOUT mTLS (no client cert) for negative testing.
+    
+    These routes HAVE authentication (openid-connect) to verify user auth succeeds,
+    but LACK client certificates, so Gateway cannot connect to backend services.
+    Expected: Auth OK → Gateway connection to backend fails → 502/503 error.
+    """
+    admin_url = f"{settings[APISIX_ADMIN_URL]}/apisix/admin/routes"
+    admin_key = settings[APISIX_ADMIN_KEY]
+    
+    # Common plugins WITH authentication but proxy will fail due to missing mTLS
+    common_plugins_no_mtls = {
+        "cors": {
+            "allow_origins": "*",
+            "allow_methods": "*",
+            "allow_headers": "*"
+        },
+        "openid-connect": {
+            "client_id": settings[CLIENT_ID],
+            "client_secret": settings[CLIENT_SECRET],
+            "discovery": f"{settings[INTERNAL_KEYCLOAK_URL]}/realms/{settings[REALM]}/.well-known/openid-configuration",
+            "bearer_only": True,
+            "realm": settings[REALM],
+            "token_signing_alg_values_expected": "RS256"
+        }
+    }
+    
+    routes = [
+        {
+            "id": "test-no-mtls-ext",
+            "uri": "/api/test/no-mtls/extension-app/*",
+            "name": "test-no-mtls-extension-route",
+            "methods": ["GET"],
+            "plugins": {
+                **common_plugins_no_mtls,
+                "proxy-rewrite": {
+                    "regex_uri": ["^/api/test/no-mtls/extension-app/(.*)", "/$1"]
+                }
+            },
+            "upstream": {
+                "nodes": {
+                    "extension-app1:8000": 1
+                },
+                "type": "roundrobin",
+                "scheme": "https"
+                # No tls section = no client certificate
+            }
+        },
+        {
+            "id": "test-no-mtls-crm",
+            "uri": "/api/test/no-mtls/crm/*",
+            "name": "test-no-mtls-crm-route",
+            "methods": ["GET"],
+            "plugins": {
+                **common_plugins_no_mtls,
+                "proxy-rewrite": {
+                    "regex_uri": ["^/api/test/no-mtls/crm/(.*)", "/$1"]
+                }
+            },
+            "upstream": {
+                "nodes": {
+                    "crm-app:8001": 1
+                },
+                "type": "roundrobin",
+                "scheme": "https"
+                # No tls section = no client certificate
+            }
+        }
+    ]
+    
+    headers = {"X-API-KEY": admin_key}
+    
+    for route in routes:
+        try:
+            response = requests.put(
+                f"{admin_url}/{route['id']}", 
+                headers=headers, 
+                json=route,
+                timeout=5
+            )
+            response.raise_for_status()
+        except requests.exceptions.RequestException as e:
+            pytest.fail(f"Failed to create no-mTLS route {route['name']}: {e}")
+            
+    yield routes
+
+    # Teardown: Delete no-mTLS test routes
+    print("\nCleaning up no-mTLS test routes...")
+    for route in routes:
+        try:
+            requests.delete(
+                f"{admin_url}/{route['id']}",
+                headers=headers,
+                timeout=5
+            )
+        except requests.exceptions.RequestException as e:
+            print(f"Warning: Failed to delete no-mTLS route {route['name']}: {e}")
+
+@pytest.fixture(scope="session")
 def keycloak_admin_token(settings):
     """Get Keycloak Master Admin token for accessing Admin API."""
     url = f"{settings[KEYCLOAK_URL]}/realms/master/protocol/openid-connect/token"

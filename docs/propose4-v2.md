@@ -198,6 +198,21 @@ Các kịch bản kiểm thử tập trung vào việc phá vỡ chuỗi tin c�
 | SEC-03 | Rogue Service | Một container lạ giả mạo Extension App gọi Core CRM App. | Core CRM App từ chối do Cert không được ký bởi Local CA. |
 | SEC-04 | Bypass Gateway | Client gọi trực tiếp IP của Extension App (bỏ qua APISIX). | Thất bại (do Extension App nằm trong Private Subnet và chỉ nhận mTLS). |
 
+### 5.5. Extension App Zone Tests (Bảo mật vùng mở rộng)
+
+Các test cases kiểm tra mTLS giữa APISIX Gateway và Extension Apps:
+
+| ID | Tên kịch bản | Mô tả | Kết quả mong đợi |
+| :--- | :--- | :--- | :--- |
+| mTLS-1 | Valid Gateway Cert | APISIX với certificate hợp lệ kết nối đến Extension App. | mTLS handshake thành công, Extension App trả về 200 OK. |
+| mTLS-2 | Direct Call Without mTLS | Gọi trực tiếp Extension App mà không qua APISIX (bypass mTLS). | Connection rejected hoặc SSL handshake failed. |
+| mTLS-3 | Verify mTLS Cert | Xác minh APISIX trình client certificate cho Extension App. | Extension App nhận và validate APISIX client cert. |
+| mTLS-4 | CRM App Zone Isolation | Kiểm tra CRM App (Core Zone) cũng yêu cầu mTLS. | APISIX kết nối thành công đến CRM App với gateway cert. |
+| mTLS-5 | Multiple Extension Apps | APISIX kết nối nhiều Extension Apps với cùng certificate. | Tất cả Extension Apps chấp nhận APISIX gateway cert. |
+| mTLS-6 | Gateway Without Cert to Extension | APISIX route không có client cert gọi Extension App. | Extension App từ chối kết nối, APISIX trả về 502. |
+| mTLS-7 | Gateway Without Cert to CRM | APISIX route không có client cert gọi CRM App. | CRM App từ chối kết nối, APISIX trả về 502. |
+
+
 
 ## 6. Kết luận
 
