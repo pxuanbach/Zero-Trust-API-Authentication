@@ -23,6 +23,7 @@ services:
       retries: 3
     volumes:
       - ./certs:/app/certs:ro
+    restart: always
 
   crm-app:
     build:
@@ -46,3 +47,4 @@ services:
       retries: 3
     volumes:
       - ./certs:/app/certs:ro
+    restart: always

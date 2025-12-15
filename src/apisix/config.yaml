@@ -7,6 +7,17 @@ apisix:
     ip: "0.0.0.0"
     port: 9092
 
+upstreams:
+  - id: 1
+    nodes:
+      "service-a:8000": 1
+    scheme: https
+    tls:
+      client_cert: /certs/apisix/apisix.crt
+      client_key: /certs/apisix/apisix.key
+      verify: true
+      ca_cert: /certs/ca/ca.crt
+
 deployment:
   role: traditional
   role_traditional:
