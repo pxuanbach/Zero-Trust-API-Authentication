@@ -1,21 +1,22 @@
 import uvicorn
-from fastapi import FastAPI, HTTPException, Header, Request
+from fastapi import FastAPI, Header, Request, HTTPException
 from typing import Optional
 import httpx
 import os
-import ssl
 import json
 import base64
+import ssl
 
 app = FastAPI(title="Extension App 1")
 
 SERVICE_NAME = os.getenv("SERVICE_NAME", "extension-app1")
-CRM_APP_URL = os.getenv("CRM_APP_URL", "https://crm-app:8001")
+CRM_APP_URL = os.getenv("CRM_APP_URL", "https://crm-app:8443")
 
 # Paths to certificates
-SERVER_CERT = os.getenv("SERVER_CERT", "/app/certs/extension-app1/service-a.crt")
-SERVER_KEY = os.getenv("SERVER_KEY", "/app/certs/extension-app1/service-a.key")
+SERVER_CERT = os.getenv("SERVER_CERT", f"/app/certs/{SERVICE_NAME}/{SERVICE_NAME}.crt")
+SERVER_KEY = os.getenv("SERVER_KEY", f"/app/certs/{SERVICE_NAME}/{SERVICE_NAME}.key")
 CA_CERT = os.getenv("CA_CERT", "/app/certs/ca/ca.crt")
+
 
 @app.get("/")
 async def root():
@@ -60,8 +61,14 @@ async def call_crm(
     }
 
     try:
-        # httpx handles loading the certs and verifying the CA automatically
-        async with httpx.AsyncClient(verify=CA_CERT, cert=(SERVER_CERT, SERVER_KEY)) as client:
+        # Create SSL context with fresh cert files
+        ssl_context = ssl.create_default_context(cafile=CA_CERT)
+        ssl_context.load_cert_chain(certfile=SERVER_CERT, keyfile=SERVER_KEY)
+        
+        async with httpx.AsyncClient(
+            verify=ssl_context,
+            timeout=30.0
+        ) as client:
             response = await client.get(
                 f"{CRM_APP_URL}/data",
                 headers=headers
@@ -99,14 +106,9 @@ async def delete_resource(resource_id: int):
     }
 
 if __name__ == "__main__":
-    # Run as HTTPS Server (mTLS Server)
     uvicorn.run(
         "main:app",
-        host="0.0.0.0",
+        host="127.0.0.1",
         port=8000,
-        ssl_keyfile=SERVER_KEY,
-        ssl_certfile=SERVER_CERT,
-        ssl_ca_certs=CA_CERT,
-        ssl_cert_reqs=ssl.CERT_REQUIRED,
-        reload=True
+        reload=False  # Disable reload in production
     )

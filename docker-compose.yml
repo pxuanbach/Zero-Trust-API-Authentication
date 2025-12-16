@@ -3,4 +3,4 @@ include:
   - ./src/keycloak.yml
   - ./src/services.yml
   - ./src/apisix.yml
-  - ./src/rotator.yml
+  # - ./src/rotator.yml

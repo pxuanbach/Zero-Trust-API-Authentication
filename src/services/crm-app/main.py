@@ -1,5 +1,5 @@
 import uvicorn
-from fastapi import FastAPI, HTTPException, Header, Request
+from fastapi import FastAPI, Header, Request
 from typing import Optional
 import os
 import ssl
@@ -9,11 +9,6 @@ import base64
 app = FastAPI(title="Core CRM App")
 
 SERVICE_NAME = os.getenv("SERVICE_NAME", "crm-app")
-
-# Paths to certificates
-SERVER_CERT = os.getenv("SERVER_CERT", "/app/certs/crm-app/service-b.crt")
-SERVER_KEY = os.getenv("SERVER_KEY", "/app/certs/crm-app/service-b.key")
-CA_CERT = os.getenv("CA_CERT", "/app/certs/ca/ca.crt")
 
 @app.get("/")
 async def root():
@@ -44,7 +39,6 @@ async def get_data(
     user_id = x_user_id
     user_roles = []
     
-    # If called directly from Gateway, parse X-Userinfo
     if x_userinfo:
         try:
             decoded_info = base64.b64decode(x_userinfo).decode('utf-8')
@@ -83,11 +77,7 @@ async def delete_data(record_id: int):
 if __name__ == "__main__":
     uvicorn.run(
         "main:app",
-        host="0.0.0.0",
+        host="127.0.0.1",
         port=8001,
-        ssl_keyfile=SERVER_KEY,
-        ssl_certfile=SERVER_CERT,
-        ssl_ca_certs=CA_CERT,
-        ssl_cert_reqs=ssl.CERT_REQUIRED, # Force Client Auth
-        reload=True
+        reload=False
     )

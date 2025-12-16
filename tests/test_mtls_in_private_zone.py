@@ -26,26 +26,17 @@ class TestExtensionAppZone:
         ID: mTLS-2
         Scenario: Direct call to Extension App without mTLS (bypassing APISIX)
         Expect: Connection fails or Extension App rejects (no client cert provided)
-        
-        Note: In Docker environment, Extension App is in private network.
-        This test verifies network isolation.
         """
-        ext_direct_url = settings[EXTENSION_APP_URL]
-        
-        try:
-            # Call without client cert (mTLS will fail)
-            response = requests.get(
-                ext_direct_url, 
-                headers=auth_headers,
-                verify=False,  # Skip server cert verification for test
-                timeout=2
-            )
-            # Extension App should require client cert
-            pytest.fail("Extension App accepted connection without client certificate")
-        except (requests.exceptions.SSLError, requests.exceptions.ConnectionError) as e:
-            assert True, "Connection correctly rejected without mTLS"
-        except requests.exceptions.Timeout:
-            assert True, "Extension App not reachable (network isolation working)"
+        # Call without client cert (mTLS will fail)
+        response = requests.get(
+            settings[EXTENSION_APP_URL], 
+            headers=auth_headers,
+            verify=False,  # Skip server cert verification for test
+            timeout=2
+        )
+
+        assert response.status_code == 400
+        assert "400 No required SSL certificate was sent" in response.text
 
     def test_mtls_3_verify_mtls_cert_in_request(self, settings, auth_headers):
         """
@@ -103,8 +94,9 @@ class TestExtensionAppZone:
         
         response = requests.get(url, headers=auth_headers)
         
-        assert response.status_code == 502, \
-            f"Expected 502 Bad Gateway, got {response.status_code}: {response.text}"
+        assert response.status_code == 400, \
+            f"Expected 400 Bad Request, got {response.status_code}: {response.text}"
+        assert "400 No required SSL certificate was sent" in response.text
 
     def test_mtls_7_gateway_without_cert_to_crm_app(self, settings, auth_headers, init_no_mtls_route):
         """
@@ -117,5 +109,6 @@ class TestExtensionAppZone:
         
         response = requests.get(url, headers=auth_headers)
         
-        assert response.status_code == 502, \
-            f"Expected 502 Bad Gateway, got {response.status_code}: {response.text}"
+        assert response.status_code == 400, \
+            f"Expected 400 Bad Request, got {response.status_code}: {response.text}"
+        assert "400 No required SSL certificate was sent" in response.text

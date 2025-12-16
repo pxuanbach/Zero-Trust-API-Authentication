@@ -21,8 +21,8 @@ def settings():
         CLIENT_SECRET: "test-client-secret",
         USERNAME: "testuser",
         PASSWORD: "testpassword123",
-        EXTENSION_APP_URL: os.getenv("EXTENSION_APP_URL", "http://localhost:8003"),
-        CRM_APP_URL: os.getenv("CRM_APP_URL", "http://localhost:8004"),
+        EXTENSION_APP_URL: os.getenv("EXTENSION_APP_URL", "https://localhost:8403"),
+        CRM_APP_URL: os.getenv("CRM_APP_URL", "https://localhost:8404"),
         APISIX_ADMIN_URL: os.getenv("APISIX_ADMIN_URL", "http://localhost:9180"),
         APISIX_ADMIN_KEY: os.getenv("APISIX_ADMIN_KEY", "edd1c9f034335f136f87ad84b625c8f1"),
         APISIX_GATEWAY_URL: os.getenv("APISIX_GATEWAY_URL", "http://localhost:9080"),
@@ -114,7 +114,7 @@ def init_apisix_routes(settings):
             },
             "upstream": {
                 "nodes": {
-                    "extension-app1:8000": 1
+                    "extension-app1:8443": 1
                 },
                 "type": "roundrobin",
                 "scheme": "https",
@@ -145,7 +145,7 @@ def init_apisix_routes(settings):
             },
             "upstream": {
                 "nodes": {
-                    "extension-app1:8000": 1
+                    "extension-app1:8443": 1
                 },
                 "type": "roundrobin",
                 "scheme": "https",
@@ -169,7 +169,7 @@ def init_apisix_routes(settings):
             },
             "upstream": {
                 "nodes": {
-                    "crm-app:8001": 1
+                    "crm-app:8443": 1
                 },
                 "type": "roundrobin",
                 "scheme": "https",
@@ -200,7 +200,7 @@ def init_apisix_routes(settings):
             },
             "upstream": {
                 "nodes": {
-                    "crm-app:8001": 1
+                    "crm-app:8443": 1
                 },
                 "type": "roundrobin",
                 "scheme": "https",
@@ -265,11 +265,10 @@ def init_apisix_routes(settings):
 
 @pytest.fixture(scope="session")
 def init_no_mtls_route(settings, init_apisix_routes):
-    """Initialize APISIX routes WITHOUT mTLS (no client cert) for negative testing.
+    """Initialize APISIX routes WITHOUT mTLS for negative testing.
     
     These routes HAVE authentication (openid-connect) to verify user auth succeeds,
-    but LACK client certificates, so Gateway cannot connect to backend services.
-    Expected: Auth OK → Gateway connection to backend fails → 502/503 error.
+    but LACK client certificates.
     """
     admin_url = f"{settings[APISIX_ADMIN_URL]}/apisix/admin/routes"
     admin_key = settings[APISIX_ADMIN_KEY]
@@ -305,7 +304,7 @@ def init_no_mtls_route(settings, init_apisix_routes):
             },
             "upstream": {
                 "nodes": {
-                    "extension-app1:8000": 1
+                    "extension-app1:8443": 1
                 },
                 "type": "roundrobin",
                 "scheme": "https"
@@ -325,7 +324,7 @@ def init_no_mtls_route(settings, init_apisix_routes):
             },
             "upstream": {
                 "nodes": {
-                    "crm-app:8001": 1
+                    "crm-app:8443": 1
                 },
                 "type": "roundrobin",
                 "scheme": "https"

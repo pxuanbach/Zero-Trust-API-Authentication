@@ -72,7 +72,7 @@ def create_routes():
             },
             "upstream": {
                 "nodes": {
-                    "extension-app1:8000": 1
+                    "extension-app1:8443": 1
                 },
                 "type": "roundrobin",
                 "scheme": "https",
@@ -103,7 +103,7 @@ def create_routes():
             },
             "upstream": {
                 "nodes": {
-                    "extension-app1:8000": 1
+                    "extension-app1:8443": 1
                 },
                 "type": "roundrobin",
                 "scheme": "https",
@@ -127,7 +127,7 @@ def create_routes():
             },
             "upstream": {
                 "nodes": {
-                    "crm-app:8001": 1
+                    "crm-app:8443": 1
                 },
                 "type": "roundrobin",
                 "scheme": "https",
@@ -158,7 +158,7 @@ def create_routes():
             },
             "upstream": {
                 "nodes": {
-                    "crm-app:8001": 1
+                    "crm-app:8443": 1
                 },
                 "type": "roundrobin",
                 "scheme": "https",

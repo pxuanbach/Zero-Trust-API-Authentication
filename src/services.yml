@@ -1,23 +1,23 @@
 services:
   extension-app1:
     build:
-      context: ./services/extension-app1
-      dockerfile: Dockerfile
+      context: ./services
+      dockerfile: extension-app1/Dockerfile
     container_name: extension-app1
     environment:
       SERVICE_NAME: extension-app1
-      CRM_APP_URL: https://crm-app:8001
+      CRM_APP_URL: https://crm-app:8443
       CERT_DIR: /app/certs
-      SERVER_CERT: /app/certs/extension-app1/service-a.crt
-      SERVER_KEY: /app/certs/extension-app1/service-a.key
+      SERVER_CERT: /app/certs/extension-app1/extension-app1.crt
+      SERVER_KEY: /app/certs/extension-app1/extension-app1.key
       CA_CERT: /app/certs/ca/ca.crt
     ports:
       - "8003:8000"
+      - "8403:8443"  # HTTPS port
     networks:
       - aaa-network
     healthcheck:
-      # Health check needs to use HTTPS now
-      test: ["CMD", "curl", "-k", "-f", "https://localhost:8000/health"]
+      test: ["CMD", "curl", "-k", "-f", "https://localhost:8443/health"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -27,21 +27,22 @@ services:
 
   crm-app:
     build:
-      context: ./services/crm-app
-      dockerfile: Dockerfile
+      context: ./services
+      dockerfile: crm-app/Dockerfile
     container_name: crm-app
     environment:
       SERVICE_NAME: crm-app
       CERT_DIR: /app/certs
-      SERVER_CERT: /app/certs/crm-app/service-b.crt
-      SERVER_KEY: /app/certs/crm-app/service-b.key
+      SERVER_CERT: /app/certs/crm-app/crm-app.crt
+      SERVER_KEY: /app/certs/crm-app/crm-app.key
       CA_CERT: /app/certs/ca/ca.crt
     ports:
       - "8004:8001"
+      - "8404:8443"  # HTTPS port
     networks:
       - aaa-network
     healthcheck:
-      test: ["CMD", "curl", "-k", "-f", "https://localhost:8001/health"]
+      test: ["CMD", "curl", "-k", "-f", "https://localhost:8443/health"]
       interval: 10s
       timeout: 5s
       retries: 3

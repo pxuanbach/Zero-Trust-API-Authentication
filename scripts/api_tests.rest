@@ -1,4 +1,5 @@
-@baseUrl = http://localhost:9080/api/v1
+# @baseUrl = http://localhost:9080/api/v1
+@baseUrl = http://nt2205-ch191-api-alb-1531005685.us-east-1.elb.amazonaws.com:9080
 @keycloakUrl = http://localhost:8080
 @realm = zero-trust
 @username = testuser
@@ -29,40 +30,3 @@ Authorization: Bearer {{authToken}}
 ### 3. Call CRM App Directly (via Gateway)
 GET {{baseUrl}}/crm/data
 Authorization: Bearer {{authToken}}
-
-### 4. Get Keycloak Admin Token
-# @name adminLogin
-POST {{keycloakUrl}}/realms/master/protocol/openid-connect/token
-Content-Type: application/x-www-form-urlencoded
-
-client_id=admin-cli
-&username={{adminUsername}}
-&password={{adminPassword}}
-&grant_type=password
-
-### Variable to store admin token
-@adminToken = {{adminLogin.response.body.access_token}}
-
-### 5. Get All Events
-GET {{keycloakUrl}}/admin/realms/{{realm}}/events
-Authorization: Bearer {{adminToken}}
-
-### 6. Get LOGIN Events Only
-GET {{keycloakUrl}}/admin/realms/{{realm}}/events?type=LOGIN&max=20
-Authorization: Bearer {{adminToken}}
-
-### 7. Get LOGIN_ERROR Events
-GET {{keycloakUrl}}/admin/realms/{{realm}}/events?type=LOGIN_ERROR&max=20
-Authorization: Bearer {{adminToken}}
-
-### 8. Get REFRESH_TOKEN Events
-GET {{keycloakUrl}}/admin/realms/{{realm}}/events?type=REFRESH_TOKEN&max=20
-Authorization: Bearer {{adminToken}}
-
-### 9. Get INTROSPECT_TOKEN Events
-GET {{keycloakUrl}}/admin/realms/{{realm}}/events?type=INTROSPECT_TOKEN&max=20
-Authorization: Bearer {{adminToken}}
-
-### 10. Clear All Events
-DELETE {{keycloakUrl}}/admin/realms/{{realm}}/events
-Authorization: Bearer {{adminToken}}
