@@ -65,8 +65,13 @@ rm-keys:
 	@aws secretsmanager delete-secret --secret-id "NT2205-CH191-api/ssh/private-key" --force-delete-without-recovery --region us-east-1
 	@echo "All secrets deleted"
 
+
+upload-secrets:
+	@powershell ./scripts/upload-secrets.ps1
+
+
 common:
-	sudo tail -n 100 /var/log/cloud-init-output.log | grep -i "error\|failed" -A 5
+	sudo tail -n 100 /var/log/cloud-init-output.log | grep -i "error\|failed" -A 10
 
 	cat /tmp/rockspec/apisix-master-0.rockspec
 
@@ -75,3 +80,34 @@ common:
 	/usr/local/apisix/bin/apisix version
 
 	systemctl status apisix
+
+	tail -50 /usr/local/apisix/logs/error.log | grep -A 10 "auth"
+
+	curl -s http://127.0.0.1:9180/apisix/admin/routes/1 \
+  -H 'X-API-KEY: edd1c9f034335f136f87ad84b625c8f1' | jq '.value | {uri, methods, upstream, plugins: .plugins | keys}'
+
+	curl -v -X POST http://127.0.0.1:9080/api/v1/auth/realms/zero-trust/protocol/openid-connect/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "client_id=test-client&client_secret=test-client-secret&username=testuser&password=testpassword123&grant_type=password"
+
+	curl -v -X POST http://10.0.10.191:8080/realms/zero-trust/protocol/openid-connect/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "client_id=test-client&client_secret=test-client-secret&username=testuser&password=testpassword123&grant_type=password"
+
+	curl -v -X GET http://127.0.0.1:9080/api/v1/extension-app/call-crm \
+	  -H "Authorization: Bearer $ADMIN_TOKEN"
+
+refresh-keypair:
+	icacls ./NT2205-CH191-api-key.pem /inheritance:r
+	icacls ./NT2205-CH191-api-key.pem /grant:r "%USERNAME%:(F)"
+	icacls ./NT2205-CH191-api-key.pem
+
+bastion-host:
+	aws secretsmanager get-secret-value \
+		--secret-id "NT2205-CH191-api/ssh/private-key" \
+		--region us-east-1 \
+		--query 'SecretString' \
+		--output text > api-key.pem
+
+# 	chmod 600 api-key.pem
+

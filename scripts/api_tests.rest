@@ -1,5 +1,5 @@
 # @baseUrl = http://localhost:9080/api/v1
-@baseUrl = http://nt2205-ch191-api-alb-1531005685.us-east-1.elb.amazonaws.com:9080
+@baseUrl = http://nt2205-ch191-api-alb-455106383.us-east-1.elb.amazonaws.com/api/v1
 @keycloakUrl = http://localhost:8080
 @realm = zero-trust
 @username = testuser
@@ -8,6 +8,9 @@
 @clientSecret = test-client-secret
 @adminUsername = admin
 @adminPassword = admin123
+@certPath = ../certs/gateway/cert.pem
+@keyPath = ../certs/gateway/key.pem
+@caPath = ../certs/ca/cert.pem
 
 ### 1. Get Access Token
 # @name login
