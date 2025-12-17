@@ -56,19 +56,19 @@ variable "services_config" {
   default = {
     gateway = {
       common_name  = "apisix.local"
-      dns_names    = ["host.docker.internal", "localhost", "apisix"]
+      dns_names    = ["host.docker.internal", "localhost", "apisix", "*.elb.amazonaws.com"]
       ip_addresses = ["127.0.0.1"]
       directory    = "gateway"
     }
     extension-app1 = {
       common_name  = "extension-app1.local"
-      dns_names    = ["host.docker.internal", "localhost", "extension-app1"]
+      dns_names    = ["host.docker.internal", "localhost", "extension-app1", "*.elb.amazonaws.com"]
       ip_addresses = ["127.0.0.1"]
       directory    = "extension-app1"
     }
     crm-app = {
       common_name  = "crm-app.local"
-      dns_names    = ["host.docker.internal", "localhost", "crm-app"]
+      dns_names    = ["host.docker.internal", "localhost", "crm-app", "*.elb.amazonaws.com"]
       ip_addresses = ["127.0.0.1"]
       directory    = "crm-app"
     }

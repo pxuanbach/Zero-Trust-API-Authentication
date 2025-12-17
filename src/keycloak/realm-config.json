@@ -23,7 +23,9 @@
       "clientAuthenticatorType": "client-secret",
       "secret": "test-client-secret",
       "redirectUris": [
-        "http://localhost:*/*"
+        "http://localhost:*/*",
+        "http://*/*",
+        "https://*/*"
       ],
       "webOrigins": [
         "+"
@@ -44,20 +46,34 @@
             "name": "Service A Resource",
             "type": "urn:service-a:resources:api",
             "ownerManagedAccess": false,
-            "uris": ["/protected", "/call-b"],
+            "uris": [
+              "/protected",
+              "/call-b"
+            ],
             "scopes": [
-              {"name": "read"},
-              {"name": "write"}
+              {
+                "name": "read"
+              },
+              {
+                "name": "write"
+              }
             ]
           },
           {
             "name": "Service B Resource",
             "type": "urn:service-b:resources:api",
             "ownerManagedAccess": false,
-            "uris": ["/data", "/process"],
+            "uris": [
+              "/data",
+              "/process"
+            ],
             "scopes": [
-              {"name": "read"},
-              {"name": "write"}
+              {
+                "name": "read"
+              },
+              {
+                "name": "write"
+              }
             ]
           }
         ],
@@ -84,8 +100,12 @@
           }
         ],
         "scopes": [
-          {"name": "read"},
-          {"name": "write"}
+          {
+            "name": "read"
+          },
+          {
+            "name": "write"
+          }
         ]
       }
     }
@@ -161,7 +181,9 @@
   ],
   "eventsEnabled": true,
   "eventsExpiration": 259200,
-  "eventsListeners": ["jboss-logging"],
+  "eventsListeners": [
+    "jboss-logging"
+  ],
   "enabledEventTypes": [
     "LOGIN",
     "LOGIN_ERROR",
