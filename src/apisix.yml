@@ -6,34 +6,32 @@ services:
     restart: on-failure
     volumes:
       - ./apisix/config.yaml:/usr/local/apisix/conf/config.yaml:ro
-      - ./certs:/certs:ro
+      - step_ca_data:/usr/local/apisix/conf/ssl/step-ca:ro
     ports:
-      - "9080:9080"  # Gateway HTTP
-      - "9443:9443"  # Gateway HTTPS
-      - "9180:9180"  # Admin API
+      - "9080:9080" # Gateway HTTP
+      - "9443:9443" # Gateway HTTPS
+      - "9180:9180" # Admin API
     depends_on:
       etcd:
         condition: service_healthy
     networks:
-      - aaa-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9080/apisix/status"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      aaa-network:
+      public-network:
+        aliases:
+          - apisix
 
   apisix-config-loader:
-    image: python:3.11-slim
+    build:
+      context: .
+      dockerfile: ./services/apisix-config-loader/Dockerfile
     container_name: apisix-config-loader
     volumes:
-      - ./apisix/init_routes.py:/app/init_routes.py:ro
-      - ./keycloak/setup_authz.py:/app/setup_authz.py:ro
-      - ./certs:/certs:ro
-    command: >
-      sh -c "pip install requests && python /app/setup_authz.py && python /app/init_routes.py"
+      - step_ca_data:/usr/local/apisix/conf/ssl/step-ca:ro
+    environment:
+      CA_PASSWORD: ${CA_PASSWORD:-secure-ca-password}
+      CA_FINGERPRINT: 3367f13ed201a7c10a9d7d4f07616e3f4420cc3704d252985c8412249e09bb8c
     depends_on:
-      apisix:
-        condition: service_healthy
+      - apisix
     networks:
       - aaa-network
 
@@ -59,6 +57,8 @@ services:
 
 networks:
   aaa-network:
+    driver: bridge
+  public-network:
     driver: bridge
 
 volumes:

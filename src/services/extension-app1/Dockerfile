@@ -7,17 +7,24 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     openssl \
     inotify-tools \
     gettext-base \
+    curl \
+    ca-certificates \
+    procps \
+    && curl -LO https://github.com/smallstep/cli/releases/download/v0.26.1/step-cli_0.26.1_amd64.deb \
+    && dpkg -i step-cli_0.26.1_amd64.deb \
+    && rm step-cli_0.26.1_amd64.deb \
     && rm -rf /var/lib/apt/lists/*
 
 COPY ./extension-app1/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY ./extension-app1/main.py .
+COPY ./extension-app1/bootstrap_certs.py .
 
-COPY ../docker/entrypoint.sh /app/entrypoint.sh
-COPY ../docker/cert-reload.sh /app/cert-reload.sh
-COPY ../docker/generate-nginx-conf.sh /app/generate-nginx-conf.sh
-COPY ../docker/nginx.conf.template /app/nginx.conf.template
+COPY ./docker/entrypoint.sh /app/entrypoint.sh
+COPY ./docker/cert-reload.sh /app/cert-reload.sh
+COPY ./docker/generate-nginx-conf.sh /app/generate-nginx-conf.sh
+COPY ./docker/nginx.conf.template /app/nginx.conf.template
 
 RUN chmod +x /app/entrypoint.sh /app/cert-reload.sh /app/generate-nginx-conf.sh
 

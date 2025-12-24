@@ -4,6 +4,9 @@ infras:
 validate-infras:
 	cd terraform && terraform validate
 
+init-ext-certs:
+	docker compose exec -e CA_PASSWORD=secure-ca-password extension-app1 python bootstrap_certs.py
+
 plan-infras:
 	cd terraform && terraform plan -var-file="env/dev.tfvars" -out=tfplan
 
@@ -64,11 +67,6 @@ rm-keys:
 	@aws secretsmanager delete-secret --secret-id "NT2205-CH191-api/crm-app/key" --force-delete-without-recovery --region us-east-1
 	@aws secretsmanager delete-secret --secret-id "NT2205-CH191-api/ssh/private-key" --force-delete-without-recovery --region us-east-1
 	@echo "All secrets deleted"
-
-
-upload-secrets:
-	@powershell ./scripts/upload-secrets.ps1
-
 
 common:
 	sudo tail -n 100 /var/log/cloud-init-output.log | grep -i "error\|failed" -A 10

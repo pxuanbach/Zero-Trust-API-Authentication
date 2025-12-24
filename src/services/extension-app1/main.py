@@ -10,7 +10,8 @@ import ssl
 app = FastAPI(title="Extension App 1")
 
 SERVICE_NAME = os.getenv("SERVICE_NAME", "extension-app1")
-CRM_APP_URL = os.getenv("CRM_APP_URL", "https://crm-app:8443")
+GATEWAY_URL = os.getenv("CRM_APP_URL", "https://apisix:9443/api/v1/crm")
+
 
 # Paths to certificates
 SERVER_CERT = os.getenv("SERVER_CERT", f"/app/certs/{SERVICE_NAME}/{SERVICE_NAME}.crt")
@@ -20,57 +21,45 @@ CA_CERT = os.getenv("CA_CERT", "/app/certs/ca/ca.crt")
 
 @app.get("/")
 async def root():
-    """Root endpoint"""
     return {
         "service": SERVICE_NAME,
         "message": "Hello from Extension App 1",
         "status": "running"
     }
 
+
 @app.get("/health")
 async def health():
     """Health check endpoint"""
     return {"status": "healthy", "service": SERVICE_NAME}
 
+
 @app.get("/call-crm")
 async def call_crm(
     request: Request,
-    x_userinfo: Optional[str] = Header(None, alias="X-Userinfo")
+    authorization: Optional[str] = Header(None),
 ):
     """
-    Endpoint to call Core CRM App using mTLS.
-    It propagates User Context received from Gateway (via X-Userinfo).
+    Endpoint to call APISIX Gateway using mTLS.
+    APISIX will forward the valid request to CRM App.
     """
-    
-    user_id = "anonymous"
-    user_roles = []
-    
-    if x_userinfo:
-        try:
-            # Decode Base64 X-Userinfo header from APISIX
-            decoded_info = base64.b64decode(x_userinfo).decode('utf-8')
-            user_info = json.loads(decoded_info)
-            user_id = user_info.get("sub", "anonymous")
-            user_roles = user_info.get("realm_access", {}).get("roles", [])
-        except Exception as e:
-            print(f"Error parsing X-Userinfo: {e}")
-
-    headers = {
-        "X-Source-Service": SERVICE_NAME,
-        "X-User-ID": user_id
-    }
+    headers = {"X-Source-Service": SERVICE_NAME}
+    if authorization:
+        headers["Authorization"] = authorization
+    else:
+        raise HTTPException(status_code=401, detail="Authorization header is required")
 
     try:
         # Create SSL context with fresh cert files
         ssl_context = ssl.create_default_context(cafile=CA_CERT)
         ssl_context.load_cert_chain(certfile=SERVER_CERT, keyfile=SERVER_KEY)
-        
+
         async with httpx.AsyncClient(
             verify=ssl_context,
             timeout=30.0
         ) as client:
             response = await client.get(
-                f"{CRM_APP_URL}/data",
+                f"{GATEWAY_URL}/data",
                 headers=headers
             )
             
@@ -82,17 +71,14 @@ async def call_crm(
                 
             return {
                 "message": "Successfully called CRM App",
-                "crm_response": response.json(),
-                "user_context": {
-                    "user_id": user_id,
-                    "roles": user_roles
-                }
+                "crm_response": response.json()
             }
             
     except httpx.RequestError as e:
         raise HTTPException(status_code=503, detail=f"Failed to connect to CRM App: {str(e)}")
     except ssl.SSLError as e:
         raise HTTPException(status_code=403, detail=f"mTLS Handshake Failed: {str(e)}")
+
 
 @app.delete("/resource/{resource_id}")
 async def delete_resource(resource_id: int):
@@ -110,5 +96,5 @@ if __name__ == "__main__":
         "main:app",
         host="127.0.0.1",
         port=8000,
-        reload=False  # Disable reload in production
+        reload=False
     )
