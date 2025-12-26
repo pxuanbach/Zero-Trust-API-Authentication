@@ -6,23 +6,47 @@ services:
     container_name: extension-app1
     environment:
       SERVICE_NAME: extension-app1
-      CRM_APP_URL: https://crm-app:8443
+      APISIX_URL: https://apisix:9443
+      GATEWAY_DOMAIN: apisix
+      CA_FINGERPRINT: 3367f13ed201a7c10a9d7d4f07616e3f4420cc3704d252985c8412249e09bb8c
       CERT_DIR: /app/certs
       SERVER_CERT: /app/certs/extension-app1/extension-app1.crt
       SERVER_KEY: /app/certs/extension-app1/extension-app1.key
       CA_CERT: /app/certs/ca/ca.crt
+      STEPDEBUG: 1
     ports:
       - "8003:8000"
-      - "8403:8443"  # HTTPS port
+      - "8403:8443" # HTTPS port
     networks:
-      - aaa-network
+      - public-network
     healthcheck:
       test: ["CMD", "curl", "-k", "-f", "https://localhost:8443/health"]
       interval: 10s
       timeout: 5s
       retries: 3
-    volumes:
-      - ./certs:/app/certs:ro
+    restart: always
+
+  extension-app2:
+    build:
+      context: ./services
+      dockerfile: extension-app1/Dockerfile
+    container_name: extension-app2
+    environment:
+      SERVICE_NAME: extension-app2
+      APISIX_URL: https://apisix:9443
+      GATEWAY_DOMAIN: apisix
+      USE_MTLS: "false"
+      VERIFY_SERVER: "false" # Since we don't have CA cert
+    ports:
+      - "8005:8000"
+      - "8405:8443"
+    networks:
+      - public-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
     restart: always
 
   crm-app:
@@ -32,13 +56,9 @@ services:
     container_name: crm-app
     environment:
       SERVICE_NAME: crm-app
-      CERT_DIR: /app/certs
-      SERVER_CERT: /app/certs/crm-app/crm-app.crt
-      SERVER_KEY: /app/certs/crm-app/crm-app.key
-      CA_CERT: /app/certs/ca/ca.crt
     ports:
       - "8004:8001"
-      - "8404:8443"  # HTTPS port
+      - "8404:8443" # HTTPS port
     networks:
       - aaa-network
     healthcheck:
@@ -46,6 +66,4 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
-    volumes:
-      - ./certs:/app/certs:ro
     restart: always

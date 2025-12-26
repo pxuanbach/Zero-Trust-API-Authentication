@@ -17,6 +17,7 @@ GATEWAY_URL = os.getenv("CRM_APP_URL", "https://apisix:9443/api/v1/crm")
 SERVER_CERT = os.getenv("SERVER_CERT", f"/app/certs/{SERVICE_NAME}/{SERVICE_NAME}.crt")
 SERVER_KEY = os.getenv("SERVER_KEY", f"/app/certs/{SERVICE_NAME}/{SERVICE_NAME}.key")
 CA_CERT = os.getenv("CA_CERT", "/app/certs/ca/ca.crt")
+USE_MTLS = os.getenv("USE_MTLS", "true").lower() == "true"
 
 
 @app.get("/")
@@ -24,7 +25,8 @@ async def root():
     return {
         "service": SERVICE_NAME,
         "message": "Hello from Extension App 1",
-        "status": "running"
+        "status": "running",
+        "mtls_enabled": USE_MTLS
     }
 
 
@@ -50,12 +52,18 @@ async def call_crm(
         raise HTTPException(status_code=401, detail="Authorization header is required")
 
     try:
-        # Create SSL context with fresh cert files
-        ssl_context = ssl.create_default_context(cafile=CA_CERT)
-        ssl_context.load_cert_chain(certfile=SERVER_CERT, keyfile=SERVER_KEY)
+        # Determine SSL context based on configuration
+        if USE_MTLS:
+            # Create SSL context with fresh cert files
+            ssl_context = ssl.create_default_context(cafile=CA_CERT)
+            ssl_context.load_cert_chain(certfile=SERVER_CERT, keyfile=SERVER_KEY)
+            verify_param = ssl_context
+        else:
+            # Disable verification if mTLS is not used (simulating app without certs)
+            verify_param = False
 
         async with httpx.AsyncClient(
-            verify=ssl_context,
+            verify=verify_param,
             timeout=30.0
         ) as client:
             response = await client.get(
@@ -94,7 +102,7 @@ async def delete_resource(resource_id: int):
 if __name__ == "__main__":
     uvicorn.run(
         "main:app",
-        host="127.0.0.1",
+        host="0.0.0.0",
         port=8000,
         reload=False
     )

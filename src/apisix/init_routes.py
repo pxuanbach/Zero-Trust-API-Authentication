@@ -264,9 +264,11 @@ def create_routes():
             "name": "health-check-route",
             "methods": ["GET"],
             "plugins": {
-                "serverless-pre-function": {
-                    "phase": "rewrite",
-                    "functions": ["return function(conf, ctx) ngx.exit(200) end"]
+                "fault-injection": {
+                    "abort": {
+                        "http_status": 200,
+                        "body": "{\"status\":\"ok\"}"
+                    }
                 }
             },
             "upstream": {
