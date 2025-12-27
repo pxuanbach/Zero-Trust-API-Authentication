@@ -138,29 +138,37 @@ def create_ssl():
     if APISIX_PUBLIC_IP:
         snis_list.append(APISIX_PUBLIC_IP)
 
-    # 1. SSL for Bootstrapping (TLS only, No mTLS)
-    ssl_bootstrap = {
+    # SSL Config with mTLS enabled, but skipped for bootstrapping endpoints
+    ssl_config = {
         "id": "1",
         "snis": snis_list,
         "cert": cert_content,
         "key": key_content,
-    }
-
-    # 2. SSL for Business API (TLS + mTLS)
-    ssl_business = {
-        "id": "2",
-        "snis": snis_list, # IP also covers business routes if accessed directly
-        "cert": cert_content,
-        "key": key_content,
         "client": {
             "ca": ca_content,
-            "depth": 10
+            "depth": 10,
+            "skip_mtls_uri": [
+                "/roots",
+                "/health",
+                "/1.0/.*",
+                "/provisioners.*",
+                "/otp/.*",
+                "/sign",
+                "/api/v1/auth/.*", # Public Auth Routes
+                "/apisix/status"
+            ]
         }
     }
 
-    print("Configuring APISIX SSL resources (Registration & Business)...", flush=True)
-    requests.put(f"{APISIX_SSL_URL}/1", headers={"X-API-KEY": ADMIN_KEY}, json=ssl_bootstrap)
-    requests.put(f"{APISIX_SSL_URL}/2", headers={"X-API-KEY": ADMIN_KEY}, json=ssl_business)
+    print("Configuring APISIX SSL resource (Enforcing mTLS with exemptions)...", flush=True)
+    
+    # Put ID 1
+    resp = requests.put(f"{APISIX_SSL_URL}/1", headers={"X-API-KEY": ADMIN_KEY}, json=ssl_config)
+    print(f"SSL Config Response: {resp.status_code} - {resp.text}", flush=True)
+    
+    # Cleanup old ID 2 if it exists (from previous dual-config setup)
+    requests.delete(f"{APISIX_SSL_URL}/2", headers={"X-API-KEY": ADMIN_KEY})
+    
     print("SSL Configuration complete.", flush=True)
 
 def create_routes():
