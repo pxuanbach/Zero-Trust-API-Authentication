@@ -21,6 +21,7 @@ services:
           - apisix
 
   apisix-config-loader:
+    image: pxuanbach/zt:apisix-config-loader
     build:
       context: .
       dockerfile: ./services/apisix-config-loader/Dockerfile

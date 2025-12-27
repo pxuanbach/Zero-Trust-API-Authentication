@@ -50,6 +50,7 @@ services:
     restart: always
 
   crm-app:
+    image: pxuanbach/zt:crm-app
     build:
       context: ./services
       dockerfile: crm-app/Dockerfile
