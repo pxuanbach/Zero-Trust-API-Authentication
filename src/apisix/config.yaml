@@ -1,6 +1,8 @@
 apisix:
   node_listen: 9080
   enable_ipv6: false
+  ssl:
+    fallback_sni: "apisix"
 
   enable_control: true
   control:
