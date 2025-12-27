@@ -214,7 +214,7 @@ def create_routes():
             },
             "upstream": {
                 "nodes": {
-                    "crm-app:8443": 1
+                    "crm-app:8404": 1
                 },
                 "type": "roundrobin",
                 "scheme": "https",
@@ -245,7 +245,7 @@ def create_routes():
             },
             "upstream": {
                 "nodes": {
-                    "crm-app:8443": 1
+                    "crm-app:8404": 1
                 },
                 "type": "roundrobin",
                 "scheme": "https",
