@@ -5,14 +5,16 @@ import requests
 
 import subprocess
 
-APISIX_ADMIN_URL = "http://apisix:9180/apisix/admin/routes"
-APISIX_SSL_URL = "http://apisix:9180/apisix/admin/ssls"
-ADMIN_KEY = "edd1c9f034335f136f87ad84b625c8f1"
+# Configuration
+APISIX_ADMIN_URL = os.getenv("APISIX_ADMIN_URL", "http://127.0.0.1:9180/apisix/admin/routes")
+APISIX_SSL_URL = os.getenv("APISIX_SSL_URL", "http://127.0.0.1:9180/apisix/admin/ssls")
+ADMIN_KEY = os.getenv("ADMIN_KEY", "edd1c9f034335f136f87ad84b625c8f1")
+STEP_CA_URL = os.getenv("STEP_CA_URL", "https://step-ca:9000")
 
-# Internal locations (no host mount)
+# Local paths (Relative to execution dir - project root)
 CERT_FILE = "/tmp/gateway.crt"
 KEY_FILE = "/tmp/gateway.key"
-CA_ROOT_FILE = "/usr/local/apisix/conf/ssl/step-ca/certs/root_ca.crt"
+CA_ROOT_FILE = "./certs/certs/root_ca.crt" # Corresponds to ./certs volume mount
 
 import hashlib
 
@@ -36,7 +38,7 @@ def ensure_root_ca():
 
     try:
         # Download from Step-CA insecurely (bootstrapping trust)
-        url = "https://step-ca:9000/roots.pem"
+        url = f"{STEP_CA_URL}/roots.pem"
         print(f"Downloading {url}...", flush=True)
         response = requests.get(url, verify=False, timeout=10)
         
@@ -82,7 +84,7 @@ def get_identity():
         token_cmd = [
             "step", "ca", "token", "apisix",
             "--password-file", pwd_file,
-            "--ca-url", "https://step-ca:9000",
+            "--ca-url", STEP_CA_URL,
             "--root", CA_ROOT_FILE
         ]
         result = subprocess.run(token_cmd, capture_output=True, text=True)
@@ -98,7 +100,7 @@ def get_identity():
         cert_cmd = [
             "step", "ca", "certificate", "apisix", CERT_FILE, KEY_FILE,
             "--token", token,
-            "--ca-url", "https://step-ca:9000",
+            "--ca-url", STEP_CA_URL,
             "--root", CA_ROOT_FILE,
             "--force"
         ]

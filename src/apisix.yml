@@ -6,7 +6,7 @@ services:
     restart: on-failure
     volumes:
       - ./apisix/config.yaml:/usr/local/apisix/conf/config.yaml:ro
-      - apisix_certs:/usr/local/apisix/conf/ssl/step-ca:ro
+      - ./certs:/usr/local/apisix/conf/ssl/step-ca:ro
     ports:
       - "9080:9080" # Gateway HTTP
       - "9443:9443" # Gateway HTTPS
@@ -19,22 +19,6 @@ services:
       public-network:
         aliases:
           - apisix
-
-  apisix-config-loader:
-    image: pxuanbach/zt:apisix-config-loader
-    build:
-      context: .
-      dockerfile: ./services/apisix-config-loader/Dockerfile
-    container_name: apisix-config-loader
-    volumes:
-      - apisix_certs:/usr/local/apisix/conf/ssl/step-ca
-    environment:
-      CA_PASSWORD: ${CA_PASSWORD:-secure-ca-password}
-      CA_FINGERPRINT: ${CA_FINGERPRINT}
-    depends_on:
-      - apisix
-    networks:
-      - aaa-network
 
   apisix-dashboard:
     image: apache/apisix-dashboard:3.0.0-alpine
@@ -64,4 +48,3 @@ networks:
 
 volumes:
   etcd_data:
-  apisix_certs:
