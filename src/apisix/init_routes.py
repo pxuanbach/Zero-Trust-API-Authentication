@@ -134,10 +134,15 @@ def create_ssl():
         print(f"Skipping SSL creation: {e}")
         return
 
+    APISIX_PUBLIC_IP = os.getenv("APISIX_PUBLIC_IP")
+    snis_list = ["apisix", "localhost", "127.0.0.1"]
+    if APISIX_PUBLIC_IP:
+        snis_list.append(APISIX_PUBLIC_IP)
+
     # 1. SSL for Bootstrapping (TLS only, No mTLS)
     ssl_bootstrap = {
         "id": "1",
-        "snis": ["apisix", "localhost"],
+        "snis": snis_list,
         "cert": cert_content,
         "key": key_content,
     }
@@ -145,7 +150,7 @@ def create_ssl():
     # 2. SSL for Business API (TLS + mTLS)
     ssl_business = {
         "id": "2",
-        "snis": ["apisix"],
+        "snis": snis_list, # IP also covers business routes if accessed directly
         "cert": cert_content,
         "key": key_content,
         "client": {
