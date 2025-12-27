@@ -14,6 +14,54 @@ CERT_FILE = "/tmp/gateway.crt"
 KEY_FILE = "/tmp/gateway.key"
 CA_ROOT_FILE = "/usr/local/apisix/conf/ssl/step-ca/certs/root_ca.crt"
 
+import hashlib
+
+def ensure_root_ca():
+    """Ensure Root CA exists by downloading from Step-CA if missing"""
+    expected_fingerprint = os.getenv("CA_FINGERPRINT")
+    if not expected_fingerprint:
+        print("WARNING: CA_FINGERPRINT not set. Skipping verification.", flush=True)
+
+    print(f"Checking Root CA at {CA_ROOT_FILE}...", flush=True)
+    if os.path.exists(CA_ROOT_FILE):
+        print("Root CA found.", flush=True)
+        # Optional: Verify existing file matches fingerprint
+        return
+
+    print("Root CA not found. Attempting to download from Step-CA...", flush=True)
+    ca_dir = os.path.dirname(CA_ROOT_FILE)
+    if not os.path.exists(ca_dir):
+        print(f"Creating directory {ca_dir}...", flush=True)
+        os.makedirs(ca_dir, exist_ok=True)
+
+    try:
+        # Download from Step-CA insecurely (bootstrapping trust)
+        url = "https://step-ca:9000/roots.pem"
+        print(f"Downloading {url}...", flush=True)
+        response = requests.get(url, verify=False, timeout=10)
+        
+        if response.status_code == 200:
+            cert_data = response.content
+            
+            # Verify Fingerprint
+            if expected_fingerprint:
+                sha256_hash = hashlib.sha256(cert_data).hexdigest()
+                print(f"Downloaded Root CA Fingerprint: {sha256_hash}", flush=True)
+                if sha256_hash.lower() != expected_fingerprint.lower():
+                    print(f"CRITICAL ERROR: Fingerprint mismatch! Expected: {expected_fingerprint}, Got: {sha256_hash}", flush=True)
+                    exit(1)
+                print("Fingerprint verified successfully.", flush=True)
+
+            with open(CA_ROOT_FILE, "wb") as f:
+                f.write(cert_data)
+            print(f"Successfully downloaded Root CA to {CA_ROOT_FILE}", flush=True)
+        else:
+            print(f"Failed to download Root CA. Status: {response.status_code}, Body: {response.text}", flush=True)
+            exit(1)
+    except Exception as e:
+        print(f"Error downloading Root CA: {e}", flush=True)
+        exit(1)
+
 def get_identity():
     """Fetch identity from internal Step-CA via internal network"""
     print("--- Starting get_identity() task ---", flush=True)
@@ -294,6 +342,7 @@ def create_routes():
             print(f"Failed to create route {route['name']}: {e}")
 
 if __name__ == "__main__":
+    ensure_root_ca()
     get_identity()
     wait_for_apisix()
     create_ssl()

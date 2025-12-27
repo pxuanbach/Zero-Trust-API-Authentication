@@ -7,17 +7,6 @@ apisix:
     ip: "0.0.0.0"
     port: 9092
 
-upstreams:
-  - id: 1
-    nodes:
-      "service-a:8000": 1
-    scheme: https
-    tls:
-      client_cert: /certs/apisix/apisix.crt
-      client_key: /certs/apisix/apisix.key
-      verify: true
-      ca_cert: /certs/ca/ca.crt
-
 deployment:
   role: traditional
   role_traditional:
@@ -51,16 +40,16 @@ plugin_attr:
       port: 9091
 
 plugins:
-  - cors              
-  - openid-connect    # Integrate AAA Server (Keycloak)
-  - authz-keycloak    # Keycloak Authorization
-  - limit-req         # Rate Limiting
-  - limit-count       # Rate Limiting
-  - request-id        
-  - http-logger       
-  - prometheus        # Monitoring
-  - proxy-rewrite     # Routing
-  - response-rewrite  # Response modification
-  - fault-injection   
-  - ip-restriction    
-  - server-info       # Dashboard info
+  - cors
+  - openid-connect # Integrate AAA Server (Keycloak)
+  - authz-keycloak # Keycloak Authorization
+  - limit-req # Rate Limiting
+  - limit-count # Rate Limiting
+  - request-id
+  - http-logger
+  - prometheus # Monitoring
+  - proxy-rewrite # Routing
+  - response-rewrite # Response modification
+  - fault-injection
+  - ip-restriction
+  - server-info # Dashboard info

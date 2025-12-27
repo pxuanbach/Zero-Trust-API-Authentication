@@ -8,7 +8,7 @@ services:
       SERVICE_NAME: extension-app1
       APISIX_URL: https://apisix:9443
       GATEWAY_DOMAIN: apisix
-      CA_FINGERPRINT: 3367f13ed201a7c10a9d7d4f07616e3f4420cc3704d252985c8412249e09bb8c
+      CA_FINGERPRINT: ${CA_FINGERPRINT}
       CERT_DIR: /app/certs
       SERVER_CERT: /app/certs/extension-app1/extension-app1.crt
       SERVER_KEY: /app/certs/extension-app1/extension-app1.key
