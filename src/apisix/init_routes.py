@@ -115,9 +115,6 @@ def create_routes():
             "uri": "/api/v1/auth/*",
             "name": "auth-route",
             "methods": ["GET", "POST"],
-            "vars": [
-                ["ssl_client_verify", "==", "SUCCESS"]
-            ],
             "plugins": {
                 "cors": {
                     "allow_origins": "*",
