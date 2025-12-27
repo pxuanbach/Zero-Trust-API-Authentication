@@ -145,7 +145,7 @@ def create_ssl():
         "client": {
             "ca": ca_content,
             "depth": 10,
-            "skip_mtls_uri": [
+            "skip_mtls_uri_regex": [
                 "^/roots",
                 "^/roots/.*",
                 "^/health",

@@ -88,6 +88,54 @@ async def call_crm(
         raise HTTPException(status_code=403, detail=f"mTLS Handshake Failed: {str(e)}")
 
 
+from pydantic import BaseModel
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+@app.post("/login")
+async def login(creds: LoginRequest):
+    """
+    Endpoint to get Access Token from Keycloak via APISIX.
+    """
+    token_url = f"{APISIX_URL}/api/v1/auth/realms/zero-trust/protocol/openid-connect/token"
+    
+    # x-www-form-urlencoded data
+    data = {
+        "client_id": "test-client",
+        "client_secret": "test-client-secret",
+        "username": creds.username,
+        "password": creds.password,
+        "grant_type": "password"
+    }
+    
+    try:
+        # Determine SSL context based on configuration
+        if USE_MTLS:
+            # Create SSL context with fresh cert files
+            ssl_context = ssl.create_default_context(cafile=CA_CERT)
+            ssl_context.load_cert_chain(certfile=SERVER_CERT, keyfile=SERVER_KEY)
+            verify_param = ssl_context
+        else:
+            # Disable verification if mTLS is not used
+            verify_param = False
+
+        async with httpx.AsyncClient(verify=verify_param) as client:
+            response = await client.post(token_url, data=data)
+            
+            if response.status_code != 200:
+                 raise HTTPException(
+                    status_code=response.status_code,
+                    detail=f"Login failed: {response.text}"
+                )
+            
+            return response.json()
+    except httpx.RequestError as e:
+         raise HTTPException(status_code=503, detail=f"Failed to connect to Auth Service: {str(e)}")
+    except ssl.SSLError as e:
+        raise HTTPException(status_code=403, detail=f"SSL Handshake Failed: {str(e)}")
+
 @app.delete("/resource/{resource_id}")
 async def delete_resource(resource_id: int):
     """
