@@ -66,12 +66,21 @@ def get_identity():
         with open(pwd_file, "w") as f:
             f.write(password)
         
+        APISIX_PUBLIC_IP = os.getenv("APISIX_PUBLIC_IP")
         token_cmd = [
             "step", "ca", "token", "apisix",
             "--password-file", pwd_file,
             "--ca-url", STEP_CA_URL,
-            "--root", CA_ROOT_FILE
+            "--root", CA_ROOT_FILE,
+            "--san", "apisix",
+            "--san", "localhost",
+            "--san", "127.0.0.1"
         ]
+
+        if APISIX_PUBLIC_IP:
+             print(f"Adding Public IP to SANs: {APISIX_PUBLIC_IP}", flush=True)
+             token_cmd.extend(["--san", APISIX_PUBLIC_IP])
+
         result = subprocess.run(token_cmd, capture_output=True, text=True)
         if result.returncode != 0:
             print(f"Token generation failed: {result.stderr}", flush=True)
@@ -82,21 +91,14 @@ def get_identity():
 
         # 2. Get Certificate
         print(f"Requesting certificate to {CERT_FILE}...", flush=True)
-        APISIX_PUBLIC_IP = os.getenv("APISIX_PUBLIC_IP")
         cert_cmd = [
             "step", "ca", "certificate", "apisix", CERT_FILE, KEY_FILE,
             "--token", token,
             "--ca-url", STEP_CA_URL,
             "--root", CA_ROOT_FILE,
-            "--san", "apisix",
-            "--san", "localhost",
-            "--san", "127.0.0.1",
             "--force"
         ]
-        if APISIX_PUBLIC_IP:
-             print(f"Adding Public IP to SANs: {APISIX_PUBLIC_IP}", flush=True)
-             cert_cmd.extend(["--san", APISIX_PUBLIC_IP])
-
+        
         cert_result = subprocess.run(cert_cmd, capture_output=True, text=True)
         if cert_result.returncode != 0:
             print(f"Certificate request failed: {cert_result.stderr}", flush=True)
