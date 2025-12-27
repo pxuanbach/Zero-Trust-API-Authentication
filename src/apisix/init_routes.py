@@ -97,13 +97,21 @@ def get_identity():
 
         # 2. Get Certificate
         print(f"Requesting certificate to {CERT_FILE}...", flush=True)
+        APISIX_PUBLIC_IP = os.getenv("APISIX_PUBLIC_IP")
         cert_cmd = [
             "step", "ca", "certificate", "apisix", CERT_FILE, KEY_FILE,
             "--token", token,
             "--ca-url", STEP_CA_URL,
             "--root", CA_ROOT_FILE,
+            "--san", "apisix",
+            "--san", "localhost",
+            "--san", "127.0.0.1",
             "--force"
         ]
+        if APISIX_PUBLIC_IP:
+             print(f"Adding Public IP to SANs: {APISIX_PUBLIC_IP}", flush=True)
+             cert_cmd.extend(["--san", APISIX_PUBLIC_IP])
+
         cert_result = subprocess.run(cert_cmd, capture_output=True, text=True)
         if cert_result.returncode != 0:
             print(f"Certificate request failed: {cert_result.stderr}", flush=True)
