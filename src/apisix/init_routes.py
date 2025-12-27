@@ -154,7 +154,6 @@ def create_ssl():
                 "/provisioners.*",
                 "/otp/.*",
                 "/sign",
-                "/api/v1/auth/.*", # Public Auth Routes
                 "/apisix/status"
             ]
         }
