@@ -64,6 +64,9 @@ def create_routes():
             "uri": "/api/v1/crm/*",
             "name": "crm-app-route",
             "methods": ["GET", "POST", "PUT"],
+            "vars": [
+                ["ssl_client_verify", "==", "SUCCESS"]
+            ],
             "plugins": {
                 **common_plugins,
                 "proxy-rewrite": {
@@ -83,6 +86,9 @@ def create_routes():
             "uri": "/api/v1/crm/*",
             "name": "crm-app-route-admin",
             "methods": ["DELETE"],
+            "vars": [
+                ["ssl_client_verify", "==", "SUCCESS"]
+            ],
             "plugins": {
                 **common_plugins,
                 "proxy-rewrite": {
@@ -109,6 +115,9 @@ def create_routes():
             "uri": "/api/v1/auth/*",
             "name": "auth-route",
             "methods": ["GET", "POST"],
+            "vars": [
+                ["ssl_client_verify", "==", "SUCCESS"]
+            ],
             "plugins": {
                 "cors": {
                     "allow_origins": "*",

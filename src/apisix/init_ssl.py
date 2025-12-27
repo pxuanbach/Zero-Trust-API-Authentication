@@ -146,15 +146,7 @@ def create_ssl():
             "ca": ca_content,
             "depth": 10,
             "skip_mtls_uri": [
-                "/roots",
-                "/roots/.*",
-                "/health",
-                "/1.0/.*",
-                "/provisioners",
-                "/provisioners/.*",
-                "/otp/.*",
-                "/sign",
-                "/apisix/status"
+                "^/.*" 
             ]
         }
     }
