@@ -10,7 +10,7 @@ import ssl
 app = FastAPI(title="Extension App 1")
 
 SERVICE_NAME = os.getenv("SERVICE_NAME", "extension-app1")
-GATEWAY_URL = os.getenv("CRM_APP_URL", "https://apisix:9443/api/v1/crm")
+APISIX_URL = os.getenv("APISIX_URL", "https://apisix:9443")
 
 
 # Paths to certificates
@@ -67,7 +67,7 @@ async def call_crm(
             timeout=30.0
         ) as client:
             response = await client.get(
-                f"{GATEWAY_URL}/data",
+                f"{APISIX_URL}/api/v1/crm/data",
                 headers=headers
             )
             
