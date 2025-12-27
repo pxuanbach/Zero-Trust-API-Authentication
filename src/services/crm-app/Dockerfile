@@ -26,5 +26,4 @@ EXPOSE 8001 8443
 ENV SERVICE_NAME=crm-app
 ENV APP_PORT=8001
 
-# Run both FastAPI and Nginx via entrypoint
-ENTRYPOINT ["/app/entrypoint.sh"]
+CMD ["python", "main.py"]

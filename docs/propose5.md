@@ -48,35 +48,35 @@ config:
     curve: stepBefore
   themeVariables:
     fontSize: 16px
+  layout: elk
 ---
 flowchart LR
-    subgraph Internet ["Untrusted Zone (Internet)"]
+ subgraph Internet["Untrusted Zone (Internet)"]
         Hacker["Hacker"]
-        PartnerApp["Partner Extension App<br>FastAPI"]
-    end
-
-    subgraph DMZ ["Public Subnet (DMZ)"]
-        APISIX["<b>Apache APISIX</b><br>mTLS & JWT Guard"]
-    end
-
-    subgraph Internal ["Private Subnet (Trusted)"]
-        CoreCRM["<b>Core CRM API</b><br>FastAPI"]
+        PartnerApp["Partner Extension App<br>FastAPI + Step Client"]
+  end
+ subgraph DMZ["Public Subnet (DMZ)"]
+        APISIX["<b>Apache APISIX</b><br>mTLS &amp; JWT Guard"]
+        Bastion["Bastion Host<br>(Jump Server)"]
+  end
+ subgraph Internal["Private Subnet (Trusted)"]
+        CoreCRM["<b>Core CRM API</b><br>FastAPI (HTTP)"]
         Keycloak["<b>Keycloak</b><br>AAA Server"]
-    end
+        StepCA["<b>Step-CA</b><br>Certificate Authority"]
+  end
+    PartnerApp -- Bootstrap Certs --> APISIX
+    APISIX -.-> StepCA
+    PartnerApp -- mTLS Handshake<br>(Client Cert) --> APISIX
+    PartnerApp -- HTTPS Request<br>(Header: Bearer JWT) --> APISIX
+    APISIX -- Validate/Introspect Token --> Keycloak
+    APISIX -- Forward Request (HTTP) --> CoreCRM
+    Hacker -. Attack without Cert .-> APISIX
+    Hacker -. Replay Stolen Token .-> APISIX
 
-    %% Flows
-    PartnerApp -- "1. mTLS Handshake<br>(Client Cert)" --> APISIX
-    PartnerApp -- "2. HTTPS Request<br>(Header: Bearer JWT)" --> APISIX
-
-    APISIX -- "3. Validate JWT" --> Keycloak
-    APISIX -- "4. Forward Request" --> CoreCRM
-
-    Hacker -. "X. Attack without Cert" .-> APISIX
-    Hacker -. "Y. Replay Stolen JWT" .-> APISIX
-
-    style APISIX fill:#f96,stroke:#333,stroke-width:2px
-    style PartnerApp fill:#bbf,stroke:#333
     style Hacker fill:#f00,stroke:#333,color:#fff
+    style PartnerApp fill:#bbf,stroke:#333
+    style APISIX fill:#f96,stroke:#333,stroke-width:2px
+    style StepCA fill:#dfd,stroke:#333
 ```
 
 ## 3. Kiến trúc hệ thống

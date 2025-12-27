@@ -11,7 +11,6 @@ APISIX_SSL_URL = os.getenv("APISIX_SSL_URL", "http://127.0.0.1:9180/apisix/admin
 ADMIN_KEY = os.getenv("ADMIN_KEY", "edd1c9f034335f136f87ad84b625c8f1")
 STEP_CA_URL = os.getenv("STEP_CA_URL", "https://step-ca:9000")
 
-# Local paths (Relative to execution dir - project root)
 CERT_FILE = "/tmp/gateway.crt"
 KEY_FILE = "/tmp/gateway.key"
 CA_ROOT_FILE = "./certs/certs/root_ca.crt" # Corresponds to ./certs volume mount
@@ -214,15 +213,10 @@ def create_routes():
             },
             "upstream": {
                 "nodes": {
-                    "crm-app:8404": 1
+                    "crm-app:8004": 1
                 },
                 "type": "roundrobin",
-                "scheme": "https",
-                "tls": {
-                    "client_cert": cert_content,
-                    "client_key": key_content,
-                    "verify": True
-                }
+                "scheme": "http"
             }
         },
         {
@@ -245,15 +239,10 @@ def create_routes():
             },
             "upstream": {
                 "nodes": {
-                    "crm-app:8404": 1
+                    "crm-app:8004": 1
                 },
                 "type": "roundrobin",
-                "scheme": "https",
-                "tls": {
-                    "client_cert": cert_content,
-                    "client_key": key_content,
-                    "verify": True
-                }
+                "scheme": "http"
             }
         },
         {
@@ -279,8 +268,6 @@ def create_routes():
             }
         },
         # Route 4: Step CA Native Endpoints
-        # The Step CLI does not respect path prefixes (e.g. /api/v1/ca), so we must expose 
-        # the standard CA endpoints at the root level.
         {
             "id": "4",
             "uris": ["/1.0/*", "/roots", "/root/*", "/provisioners", "/provisioners/*", "/health", "/otp/*", "/sign"],
