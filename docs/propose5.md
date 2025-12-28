@@ -32,12 +32,14 @@ Khi Core CRM mở API ra Internet, chúng ta đối mặt với các bề mặt 
 ### 2.2. Công nghệ sử dụng
 
 - **API Gateway:** **Apache APISIX** (đặt tại Public Subnet). Đóng vai trò là điểm cuối mTLS (mTLS Termination) và xác thực JWT.
-- **AAA Server:** **Keycloak**. Quản lý danh tính người dùng và cấp phát Access Token.
-- **Core Services:** **FastAPI Application**. Chứa logic lõi, chạy trong Private Subnet, không public ra ngoài.
-- **Extension Apps:** **FastAPI Application**. Chạy giả lập trên môi trường bên ngoài (bên ngoài Docker Network nội bộ hoặc từ host machine), đại diện cho Partner App.
+- **AAA Server:** **Keycloak** (đặt tại Public Subnet). Quản lý danh tính người dùng và cấp phát Access Token; vẫn được bảo vệ bởi APISIX Routes.
+- **PKI Infrastructure:** **Smallstep/Step-CA** (đặt tại Public Subnet). Quản lý cấp phát chứng chỉ cho Partner; vẫn được bảo vệ bởi APISIX Routes.
+- **Core Services:** **FastAPI Application**. Chứa logic lõi, chạy trong Private Subnet. Chỉ chấp nhận kết nối mTLS từ APISIX.
+- **Extension Apps:** **FastAPI Application**. Chạy giả lập trên môi trường bên ngoài, đại diện cho Partner App.
 - **Security Protocol:**
-  - **mTLS (Mutual TLS):** Xác thực định danh hai chiều giữa Partner App và APISIX Gateway.
-  - **JWT (JSON Web Token):** Xác thực quyền của người dùng cuối (End-user context).
+  - **mTLS (Mutual TLS) - Frontend:** Xác thực giữa Partner App và APISIX.
+  - **mTLS (Mutual TLS) - Backend:** Xác thực giữa APISIX và Core CRM App để đảm bảo Zero Trust nội bộ.
+  - **JWT (JSON Web Token):** Xác thực quyền người dùng, được **bind** với Certificate của Partner (Sender Constrained).
 
 ### 2.3. Sơ đồ kiến trúc triển khai
 
@@ -48,35 +50,37 @@ config:
     curve: stepBefore
   themeVariables:
     fontSize: 16px
-  layout: elk
+  layout: dagre
 ---
-flowchart LR
+flowchart TB
  subgraph Internet["Untrusted Zone (Internet)"]
-        Hacker["Hacker"]
         PartnerApp["Partner Extension App<br>FastAPI + Step Client"]
   end
- subgraph DMZ["Public Subnet (DMZ)"]
+ subgraph PublicSubnet["Public Subnet"]
         APISIX["<b>Apache APISIX</b><br>mTLS &amp; JWT Guard"]
-        Bastion["Bastion Host<br>(Jump Server)"]
-  end
- subgraph Internal["Private Subnet (Trusted)"]
-        CoreCRM["<b>Core CRM API</b><br>FastAPI (HTTP)"]
         Keycloak["<b>Keycloak</b><br>AAA Server"]
         StepCA["<b>Step-CA</b><br>Certificate Authority"]
   end
-    PartnerApp -- Bootstrap Certs --> APISIX
-    APISIX -.-> StepCA
+ subgraph PrivateSubnet["Private Subnet (Trusted)"]
+        CoreCRM["<b>Core CRM API</b><br>FastAPI (HTTPs/mTLS)"]
+  end
+ subgraph VPC["AWS VPC"]
+        PrivateSubnet
+        PublicSubnet
+  end
+    EndUser["👤 End-users"] --> PartnerApp
+    APISIX -- Forward Request (mTLS) --> CoreCRM
+    APISIX -.-> StepCA & Keycloak
     PartnerApp -- mTLS Handshake<br>(Client Cert) --> APISIX
-    PartnerApp -- HTTPS Request<br>(Header: Bearer JWT) --> APISIX
-    APISIX -- Validate/Introspect Token --> Keycloak
-    APISIX -- Forward Request (HTTP) --> CoreCRM
-    Hacker -. Attack without Cert .-> APISIX
-    Hacker -. Replay Stolen Token .-> APISIX
+    PartnerApp -- "HTTPS Request<br>(Header: Bearer Bound-JWT)" --> APISIX
 
-    style Hacker fill:#f00,stroke:#333,color:#fff
     style PartnerApp fill:#bbf,stroke:#333
-    style APISIX fill:#f96,stroke:#333,stroke-width:2px
-    style StepCA fill:#dfd,stroke:#333
+    style APISIX fill:pink,stroke:#333,stroke-width:2px
+    style Keycloak fill:orange,stroke:#01579b
+    style StepCA fill:#e1f5fe,stroke:#01579b
+    style PrivateSubnet stroke:#FF6D00
+    style PublicSubnet stroke:#757575
+    style Internet stroke:#D50000
 ```
 
 ## 3. Kiến trúc hệ thống
@@ -98,30 +102,31 @@ flowchart TD
     end
 
     subgraph AWS_VPC ["AWS VPC"]
-        subgraph PublicSubnet ["Public Subnet (DMZ)"]
-            ALB["AWS ALB"]
+        subgraph PublicSubnet ["Public Subnet"]
             APISIX["<b>APISIX Gateway</b><br/>mTLS Termination"]
-        end
 
-        subgraph PrivateSubnet ["Private Subnet (Trusted)"]
             subgraph Security_Admin ["Security & Admin Services"]
-                Keycloak["Keycloak (AAA)"]
+                Keycloak["AAA Server"]
                 LocalCA["Local CA"]
             end
+        end
 
-            subgraph Application_Core ["Application Core"]
-                CoreCRM["Core CRM API"]
-                DB[("PostgreSQL")]
-            end
+        subgraph PrivateSubnet ["Private Subnet"]
+            CoreCRM["Core CRM Apps"]
+            DB[("Database")]
         end
     end
+    EndUser["👤 End-users"]
+
 
     %% Connections
-    P1 -- "mTLS + JWT" --> APISIX
-    P2 -- "mTLS + JWT" --> APISIX
+    P1 -- "mTLS + Bound JWT" --> APISIX
+    P2 -- "mTLS + Bound JWT" --> APISIX
 
+    EndUser --> P1
+    EndUser --> P2
     APISIX <-->|"Verify JWT"| Keycloak
-    APISIX -- "Trusted Traffic" --> CoreCRM
+    APISIX -- "mTLS" --> CoreCRM
     CoreCRM --> DB
 
     %% Certificate Issuance via Proxy
@@ -145,21 +150,18 @@ flowchart TD
     - Bao gồm các hệ thống bên ngoài đa dạng (Cloud, On-prem).
     - Mỗi đối tác được cấp một **Digital Identity** (Chứng thư số - Client Certificate) duy nhất. Đây là "giấy thông hành" để bước tới cổng nhà chúng ta.
 
-2.  **Lớp Biên & Bảo mật:**
+2.  **Lớp Biên & Bảo mật (Public Subnet):**
 
-    - **Thành phần chính:** API Gateway & Web Application Firewall (WAF).
+    - **Thành phần chính:** API Gateway, Keycloak, Step-CA.
     - **Nhiệm vụ:**
-      - **mTLS Termination:** Chặn tất cả kết nối không có Client Certificate hợp lệ ngay từ tầng Transport (Lớp 4).
-      - **CA Proxy (Registration Authority):** Nhận yêu cầu CSR từ đối tác bên ngoài và chuyển tiếp an toàn vào Local CA nội bộ.
+      - **mTLS Termination:** Chặn tất cả kết nối không có Client Certificate hợp lệ ngay từ tầng Transport.
+      - **Identity & Access:** Keycloak quản lý user và cấp token. Step-CA quản lý chứng chỉ. Mặc dù nằm ở Public Subnet, các service này vẫn nên được truy cập thông qua APISIX để thống nhất chính sách bảo mật.
 
-3.  **Lớp Định danh & Ủy quyền:**
-
-    - **Thành phần chính:** AAA Server (Keycloak) và **Local CA**.
-    - **Nhiệm vụ:** Local CA quản lý vòng đời chứng chỉ nhưng hoàn toàn biệt lập với Internet, chỉ giao tiếp qua Proxy.
-
-4.  **Lớp Lõi:**
-    - **Thành phần chính:** Microservices, Databases.
-    - **Nhiệm vụ:** Chỉ xử lý các yêu cầu đã được "lọc sạch" qua 2 lớp bảo vệ (mTLS + JWT).
+3.  **Lớp Lõi (Private Subnet):**
+    - **Thành phần chính:** Microservices (CRM App), Databases.
+    - **Nhiệm vụ:**
+      - Chỉ xử lý các yêu cầu đến từ APISIX thông qua kênh **mTLS**.
+      - Thực hiện **xác thực lại JWT** (Defense in Depth) để đảm bảo token hợp lệ và đúng là token dành cho Partner đang gọi.
 
 ## 4. Use-cases chi tiết
 
@@ -169,78 +171,58 @@ flowchart TD
 - **Luồng xử lý:**
   1.  Partner App khởi tạo kết nối TLS tới APISIX.
   2.  APISIX yêu cầu Client Certificate. Partner App gửi chứng chỉ hợp lệ.
-  3.  APISIX kiểm tra chứng chỉ có được ký bởi **Local CA** tin cậy không và còn hạn không. (Nếu sai -> Ngắt kết nối).
+  3.  APISIX kiểm tra chứng chỉ (CA, Expiry, Revocation). (Nếu sai -> Ngắt kết nối).
   4.  Nếu mTLS OK, APISIX đọc HTTP Header `Authorization: Bearer <token>`.
-  5.  APISIX xác thực Token với Keycloak (Signature, Expiry).
-  6.  Nếu Token OK, request được chuyển tiếp vào Core CRM.
+  5.  APISIX xác thực Token với Keycloak (Introspection) và kiểm tra xem Token này có **bind** với Client Certificate hiện tại không (ví dụ: check claim `cnf` hoặc `client_id` khớp với `CN` trong cert).
+  6.  Nếu hợp lệ, APISIX khởi tạo kết nối **mTLS** tới Core CRM và chuyển tiếp request.
+  7.  **Core CRM** nhận request, validate mTLS từ APISIX, và tiếp tục **validate JWT** một lần nữa (signature, audience) để đảm bảo Zero Trust tuyệt đối.
 
-### 4.2. UC-02: Ràng buộc ngữ cảnh người dùng
+### 4.2. UC-02: Ràng buộc ngữ cảnh người dùng & Partner (Certificate Binding)
 
-- **Mô tả:** Đảm bảo Extension App không thể tự ý hành động nếu không có sự cho phép của User.
+- **Mô tả:** Đảm bảo JWT chỉ có thể được sử dụng bởi đúng Partner đã được cấp chứng chỉ (Sender Constrained Token).
 - **Luồng xử lý:**
-  1.  User đăng nhập trên giao diện Extension App -> nhận JWT từ Keycloak.
-  2.  Extension App dùng JWT đó để đại diện cho User gọi xuống Core CRM.
-  3.  Core CRM nhận diện được: "Đây là request từ Partner A (qua mTLS), thực hiện bởi User B (qua JWT)".
+  1.  Khi User đăng nhập qua Partner App, Partner App gửi request lấy token kèm theo thông tin Client Certificate của mình.
+  2.  Keycloak cấp phát JWT, trong đó có chứa thông tin định danh của Partner (ví dụ hash của cert hoặc `client_id` của partner) vào trong token (claim `绑定` hoặc `cnf`).
+  3.  Khi Partner App dùng Token này gọi API:
+      - APISIX trích xuất thông tin từ Client Cert đang kết nối (Layer 4).
+      - APISIX/CRM App giải mã JWT (Layer 7) và so sánh thông tin định danh Partner trong Token với thông tin từ Client Cert.
+      - Nếu không khớp (ví dụ: Hacker trộm token của User từ Partner A nhưng đem sang máy Partner B hoặc máy cá nhân để dùng), request bị từ chối.
 
 ### 4.3. UC-03: Quản lý định danh tự động (Automated Identity Management)
 
 - **Mô tả:** Tự động hóa hoàn toàn vòng đời chứng chỉ để giảm thiểu rủi ro vận hành và lộ lọt khóa.
 - **Luồng xử lý:**
-  1.  **Giai đoạn Bootstrapping (Cấp phát lần đầu):**
-      - Extension App được cấp một **One-time Token** (hoặc Provisioner Key) an toàn khi khởi tạo (qua CI/CD).
-      - App tự sinh cặp Private/Public Key nội bộ (không bao giờ truyền đi).
-      - App tạo một yêu cầu ký chứng chỉ (**CSR**) gửi tới Local CA kèm theo Token đã được cấp.
-      - Local CA xác thực Token, ký CSR và trả về Certificate (.crt) cho App.
-  2.  **Giai đoạn Vận hành (Monitoring):**
-      - Một tiến trình Agent chạy ngầm trong App định kỳ kiểm tra thời hạn của Certificate hiện tại.
-  3.  **Giai đoạn Xoay vòng (Rotation):**
-      - Khi thời hạn còn dưới 20% (ví dụ: còn 1 tiếng trên tổng 5 tiếng), Agent gửi yêu cầu gia hạn (**Renewal**) tới Local CA.
-      - Vì App đang sở hữu chứng chỉ cũ hợp lệ, Local CA sử dụng chính chứng chỉ đó để xác thực yêu cầu gia hạn (Mutual Auth).
-      - Local CA cấp chứng chỉ mới với thời hạn mới.
-      - App tự động nạp (hot-reload) chứng chỉ mới mà không cần khởi động lại.
+  1.  **Giai đoạn Bootstrapping:**
+      - Extension App dùng One-time Token gọi qua APISIX vào Step-CA (đang ở Public Subnet nhưng route qua APISIX) để lấy chứng chỉ.
+  2.  **Giai đoạn Vận hành:**
+      - App chạy ngầm service kiểm tra hạn chứng chỉ.
+  3.  **Giai đoạn Xoay vòng:**
+      - App gọi APISIX -> Step-CA để renew chứng chỉ trước khi hết hạn.
 
 ## 5. Mô phỏng tấn công & Ngăn chặn
 
-Dưới đây là 2 kịch bản tấn công điển hình và cách hệ thống phòng thủ:
-
 ### Kịch bản 1: Đối tác giả mạo
 
-- **Tấn công:** Hacker biết địa chỉ API public (`https://api.crm.com`). Hacker dùng `curl` hoặc tool tấn công web để gửi request dò tìm lỗ hổng hoặc spam dữ liệu.
+- **Kết quả phòng thủ:** APISIX từ chối bắt tay SSL (**TLS Handshake Failure**).
 
-```bash
-curl -X POST https://api.crm.com/api/v1/customers
-```
+### Kịch bản 2: Tấn công phát lại Token (Replay Attack)
 
+- **Tấn công:** Hacker trộm JWT hợp lệ và thử replay từ máy cá nhân hoặc server khác.
 - **Kết quả phòng thủ:**
-  - Do Hacker không có Private Key/Certificate hợp lệ (chưa được cấp phát).
-  - APISIX từ chối bắt tay SSL (**TLS Handshake Failure**).
-  - Kết nối bị ngắt ngay lập tức. Request HTTP thậm chí còn không được gửi đi. Hacker không thể khai thác lỗ hổng SQL Injection hay XSS vì không chạm được vào tầng ứng dụng.
-
-### Kịch bản 2: Tấn công phát lại Token
-
-- **Tấn công:**
-  - Hacker cài phần mềm nghe lén (hoặc đứng sau lưng nhân viên) và chụp được chuỗi **Access Token (JWT)** hợp lệ của một quản lý cấp cao.
-  - Hacker mang Token về máy cá nhân, dùng Postman để gửi request xóa dữ liệu, giả danh quản lý đó.
-- **Kết quả phòng thủ:**
-  - Máy cá nhân của Hacker kết nối tới APISIX.
-  - APISIX yêu cầu Client Certificate (mTLS).
-  - Hacker **không có** Certificate (vì Certificate file được lưu bảo mật trên server của Partner hoặc trong thiết bị bảo mật, Hacker chỉ trộm được Token string).
-  - Kết nối thất bại. Token dù hợp lệ (còn hạn, đúng chữ ký) cũng trở nên vô dụng vì kẻ gửi nó không có "Phương tiện vận chuyển tin cậy" (Authenticated Channel).
+  - **Lớp 1 (mTLS):** Hacker không có Client Cert hợp lệ -> Rớt ngay tại cổng APISIX.
+  - **Lớp 2 (Binding Check):** Giả sử Hacker có một Client Cert hợp lệ của _Partner B_ (thông đồng), nhưng lại dùng Token trộm được từ _Partner A_.
+    - APISIX/CRM check thấy: `Token.issued_for = Partner A` nhưng `TLS.client_cert = Partner B`.
+    - -> **Phát hiện bất thường và Chặn**.
 
 ## 6. Đánh giá
 
-So sánh kiến trúc Hybrid mTLS này với các mô hình phổ biến khác:
-
-| Tiêu chí                  | Mô hình truyền thống (IP Whitelist) | Mô hình API Key / Token thường | Mô hình đề xuất (Zero Trust mTLS)                    |
-| :------------------------ | :---------------------------------- | :----------------------------- | :--------------------------------------------------- |
-| **Chống giả mạo IP**      | Thấp (Dễ bị IP Spoofing)            | Thấp                           | **Cao** (Dùng Cryptographic Identity)                |
-| **Bảo mật đường truyền**  | Phụ thuộc VPN                       | Dựa vào server HTTPS một chiều | **Cao nhất** (Mã hóa & Xác thực 2 chiều)             |
-| **Chống Replay Attack**   | Thấp                                | Thấp                           | **Trung bình - Cao** (Token gắn với kênh bảo mật)    |
-| **Vận hành (Complexity)** | Đơn giản                            | Đơn giản                       | **Phức tạp** (Cần quản lý CA, cấp phát/thu hồi Cert) |
-| **Phù hợp Internet**      | Kém (IP động khó quản)              | Tốt                            | **Rất tốt** (Không phụ thuộc mạng/IP)                |
+| Tiêu chí                | Mô hình cũ (Private Auth)       | Mô hình mới (Public Auth + Binding)                 |
+| :---------------------- | :------------------------------ | :-------------------------------------------------- |
+| **Vị trí Auth Service** | Private (An toàn, khó tiếp cận) | **Public** (Linh hoạt, dễ tích hợp Extension)       |
+| **Bảo mật Nội bộ**      | HTTP (Tin tưởng mạng LAN)       | **mTLS** (Zero Trust hoàn toàn giữa Gateway & App)  |
+| **Ràng buộc Token**     | Không/Yếu                       | **Mạnh** (Token gắn chết với Certificate người gọi) |
+| **Độ phức tạp**         | Trung bình                      | **Cao** (Cấu hình mTLS 2 đầu, Custom Token Claims)  |
 
 ## 7. Kết luận
 
-Với mô hình **Hybrid Extension Ecosystem**, việc chuyển sang kiến trúc sử dụng **mTLS** tại lớp biên (Edge) kết hợp với **JWT** là bước đi chiến lược cần thiết. Nó chuyển đổi trạng thái bảo mật từ Network Trust sang Identity Trust.
-
-Mặc dù có chi phí vận hành cao hơn trong việc quản lý chứng chỉ số, nhưng đổi lại, hệ thống đạt được khả năng phòng thủ chiều sâu (Defense in Depth) mạnh mẽ trước các mối đe dọa từ Internet, đặc biệt là khả năng vô hiệu hóa các cuộc tấn công giả mạo và lạm dụng Token.
+Kiến trúc mới không chỉ mở rộng khả năng tích hợp (đưa Auth/CA ra Public Subnet) mà còn siết chặt bảo mật lên mức cao nhất bằng cách áp dụng **mTLS end-to-end** (từ App đến Gateway và từ Gateway đến Core) và cơ chế **Sender Constrained Token**. Điều này đảm bảo rằng dù các thành phần quan trọng nằm ở vùng mạng Public, chúng vẫn được bảo vệ bởi lớp vỏ định danh số học không thể giả mạo.
