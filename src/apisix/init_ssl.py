@@ -148,6 +148,7 @@ def create_ssl():
             "skip_mtls_uri_regex": [
                 "^/roots",
                 "^/roots/.*",
+                "^/root/.*",
                 "^/health",
                 "^/1.0/.*",
                 "^/provisioners",
