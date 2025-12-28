@@ -43,38 +43,13 @@
         "policyEnforcementMode": "ENFORCING",
         "resources": [
           {
-            "name": "Service A Resource",
-            "type": "urn:service-a:resources:api",
+            "name": "CRM App Delete Resource",
+            "type": "urn:crm-app:resources:api",
             "ownerManagedAccess": false,
             "uris": [
-              "/protected",
-              "/call-b"
+              "/api/v1/crm/*"
             ],
-            "scopes": [
-              {
-                "name": "read"
-              },
-              {
-                "name": "write"
-              }
-            ]
-          },
-          {
-            "name": "Service B Resource",
-            "type": "urn:service-b:resources:api",
-            "ownerManagedAccess": false,
-            "uris": [
-              "/data",
-              "/process"
-            ],
-            "scopes": [
-              {
-                "name": "read"
-              },
-              {
-                "name": "write"
-              }
-            ]
+            "scopes": []
           }
         ],
         "policies": [
@@ -96,6 +71,16 @@
             "decisionStrategy": "UNANIMOUS",
             "config": {
               "roles": "[{\"id\":\"user\",\"required\":true}]"
+            }
+          },
+          {
+            "name": "CRM App Delete Resource Permission",
+            "type": "resource",
+            "logic": "POSITIVE",
+            "decisionStrategy": "UNANIMOUS",
+            "config": {
+              "resources": "[\"CRM App Delete Resource\"]",
+              "applyPolicies": "[\"Admin Only Policy\"]"
             }
           }
         ],

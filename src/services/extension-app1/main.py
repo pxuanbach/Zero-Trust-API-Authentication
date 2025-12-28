@@ -43,7 +43,6 @@ async def call_crm(
 ):
     """
     Endpoint to call APISIX Gateway using mTLS.
-    APISIX will forward the valid request to CRM App.
     """
     headers = {"X-Source-Service": SERVICE_NAME}
     if authorization:
@@ -52,14 +51,12 @@ async def call_crm(
         raise HTTPException(status_code=401, detail="Authorization header is required")
 
     try:
-        # Determine SSL context based on configuration
         if USE_MTLS:
             # Create SSL context with fresh cert files
             ssl_context = ssl.create_default_context(cafile=CA_CERT)
             ssl_context.load_cert_chain(certfile=SERVER_CERT, keyfile=SERVER_KEY)
             verify_param = ssl_context
         else:
-            # Disable verification if mTLS is not used (simulating app without certs)
             verify_param = False
 
         async with httpx.AsyncClient(
@@ -68,6 +65,56 @@ async def call_crm(
         ) as client:
             response = await client.get(
                 f"{APISIX_URL}/api/v1/crm/data",
+                headers=headers
+            )
+            
+            if response.status_code != 200:
+                raise HTTPException(
+                    status_code=response.status_code,
+                    detail=f"CRM App returned error: {response.text}"
+                )
+                
+            return {
+                "message": "Successfully called CRM App",
+                "crm_response": response.json()
+            }
+            
+    except httpx.RequestError as e:
+        raise HTTPException(status_code=503, detail=f"Failed to connect to CRM App: {str(e)}")
+    except ssl.SSLError as e:
+        raise HTTPException(status_code=403, detail=f"mTLS Handshake Failed: {str(e)}")
+
+
+@app.delete("/call-delete-crm-resource/{resource_id}")
+async def call_delete_crm_resource(
+    request: Request,
+    resource_id: int,
+    authorization: Optional[str] = Header(None),
+):
+    """
+    Endpoint to call APISIX Gateway using mTLS.
+    """
+    headers = {"X-Source-Service": SERVICE_NAME}
+    if authorization:
+        headers["Authorization"] = authorization
+    else:
+        raise HTTPException(status_code=401, detail="Authorization header is required")
+
+    try:
+        if USE_MTLS:
+            # Create SSL context with fresh cert files
+            ssl_context = ssl.create_default_context(cafile=CA_CERT)
+            ssl_context.load_cert_chain(certfile=SERVER_CERT, keyfile=SERVER_KEY)
+            verify_param = ssl_context
+        else:
+            verify_param = False
+
+        async with httpx.AsyncClient(
+            verify=verify_param,
+            timeout=30.0
+        ) as client:
+            response = await client.delete(
+                f"{APISIX_URL}/api/v1/crm/data/{resource_id}",
                 headers=headers
             )
             
