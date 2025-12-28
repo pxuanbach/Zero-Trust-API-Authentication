@@ -93,6 +93,7 @@ def get_identity():
             "--token", token,
             "--ca-url", STEP_CA_URL,
             "--root", CA_ROOT_FILE,
+            "--kty", "OKP", "--curve", "Ed25519", # Use Ed25519
             "--force"
         ]
         
