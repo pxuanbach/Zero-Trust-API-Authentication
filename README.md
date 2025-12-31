@@ -1,3 +1,9 @@
-# Zero‑Trust API Authentication: Proxy with mTLS + Token‑Based Signatures
+# ZERO TRUST ARCHITECTURE FOR AN EXTENSIBLE CRM ECOSYSTEM ON HYBRID CLOUD
 
-Tên đề tài tiếng Việt: Xây dựng proxy sử dụng mTLS kết hợp token‑based signatures (PoP/DPoP/holder‑of‑key) cho môi trường API & Cloud
+Tên đề tài tiếng Việt: KIẾN TRÚC ZERO TRUST CHO HỆ SINH THÁI CRM MỞ RỘNG TRÊN NỀN TẢNG HYBRID CLOUD 
+
+Học viên:
+- 240202002 - Phạm Xuân Bách
+- 240202015 - Nguyễn Khánh Toàn
+
+GVHD: TS. Nguyễn Ngọc Tự
