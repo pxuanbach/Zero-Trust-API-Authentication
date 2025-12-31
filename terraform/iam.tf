@@ -1,6 +1,3 @@
-# ===== IAM ROLES & POLICIES =====
-
-# EC2 Instance Role
 resource "aws_iam_role" "ec2_role" {
   name = "${var.project_name}-ec2-role"
 
@@ -34,16 +31,13 @@ resource "aws_iam_role_policy" "secrets_manager" {
         Effect = "Allow"
         Action = [
           "secretsmanager:GetSecretValue",
-          "secretsmanager:DescribeSecret"
+          "secretsmanager:DescribeSecret",
+          "secretsmanager:PutSecretValue",
+          "secretsmanager:UpdateSecret"
         ]
         Resource = [
-          aws_secretsmanager_secret.gateway_cert.arn,
-          aws_secretsmanager_secret.gateway_key.arn,
-          aws_secretsmanager_secret.ca_cert.arn,
-          aws_secretsmanager_secret.keycloak_credentials.arn,
-          aws_secretsmanager_secret.apisix_credentials.arn,
-          aws_secretsmanager_secret.keycloak_client.arn,
-          aws_secretsmanager_secret.ssh_private_key.arn
+          aws_secretsmanager_secret.ssh_private_key.arn,
+          aws_secretsmanager_secret.ca_fingerprint.arn
         ]
       }
     ]

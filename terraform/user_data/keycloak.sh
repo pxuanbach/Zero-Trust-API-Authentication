@@ -209,8 +209,6 @@ POLICY_ID=$(curl -s -G "$AUTHZ_URL/policy" \
 if [ -z "$POLICY_ID" ] || [ "$POLICY_ID" == "null" ]; then
   echo "Error: 'Admin Only Policy' not found!"
 else
-  RES_ID=$(create_resource "Extension App Delete Resource" "/api/v1/extension-app/*" "delete")
-  create_permission "Extension App Delete Permission" "$RES_ID" "$POLICY_ID"
   RES_ID=$(create_resource "CRM App Delete Resource" "/api/v1/crm/*" "delete")
   create_permission "CRM App Delete Permission" "$RES_ID" "$POLICY_ID"
 fi

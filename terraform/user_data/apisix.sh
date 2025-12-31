@@ -220,13 +220,6 @@ curl http://127.0.0.1:9180/apisix/admin/routes/2 \
       "plugins": ($plugins + {
         "proxy-rewrite": {
           "regex_uri": ["^/api/v1/extension-app/(.*)", "/$1"]
-        },
-        "authz-keycloak": {
-          "token_endpoint": "http://'${alb_dns_name}'/api/v1/auth/realms/zero-trust/protocol/openid-connect/token",
-          "client_id": "test-client",
-          "client_secret": "test-client-secret",
-          "policy_enforcement_mode": "ENFORCING",
-          "permissions": ["Extension App Delete Resource"]
         }
       }),
       "upstream": {

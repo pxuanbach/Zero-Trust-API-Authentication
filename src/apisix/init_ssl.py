@@ -102,6 +102,40 @@ def get_identity():
             return
 
         print(f"Successfully obtained identity: {CERT_FILE}", flush=True)
+
+        # 3. Get Client Certificate for Backend mTLS
+        print("requesting client certificate for backend mTLS...", flush=True)
+        CERT_FILE_CLIENT = "/tmp/gateway_client.crt"
+        KEY_FILE_CLIENT = "/tmp/gateway_client.key"
+
+        # Generate Token for Client Cert
+        token_client_cmd = [
+            "step", "ca", "token", "apisix-client",
+            "--password-file", pwd_file,
+            "--ca-url", STEP_CA_URL,
+            "--root", CA_ROOT_FILE
+        ]
+        result_client = subprocess.run(token_client_cmd, capture_output=True, text=True)
+        if result_client.returncode != 0:
+            print(f"Client Token generation failed: {result_client.stderr}", flush=True)
+            return
+        token_client = result_client.stdout.strip().split('\n')[-1]
+
+        # Get Client Cert
+        cert_client_cmd = [
+            "step", "ca", "certificate", "apisix-client", CERT_FILE_CLIENT, KEY_FILE_CLIENT,
+            "--token", token_client,
+            "--ca-url", STEP_CA_URL,
+            "--root", CA_ROOT_FILE,
+            "--force"
+        ]
+        cert_client_result = subprocess.run(cert_client_cmd, capture_output=True, text=True)
+        if cert_client_result.returncode != 0:
+            print(f"Client Certificate request failed: {cert_client_result.stderr}", flush=True)
+            return
+        
+        print(f"Successfully obtained client identity: {CERT_FILE_CLIENT}", flush=True)
+
     except Exception as e:
         print(f"Unexpected error in get_identity: {e}", flush=True)
 

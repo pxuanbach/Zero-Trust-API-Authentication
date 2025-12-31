@@ -8,6 +8,8 @@ ADMIN_KEY = os.getenv("ADMIN_KEY", "edd1c9f034335f136f87ad84b625c8f1")
 
 CERT_FILE = "/tmp/gateway.crt"
 KEY_FILE = "/tmp/gateway.key"
+CERT_FILE_CLIENT = "/tmp/gateway_client.crt"
+KEY_FILE_CLIENT = "/tmp/gateway_client.key"
 
 def wait_for_apisix():
     print("Waiting for APISIX...")
@@ -28,6 +30,13 @@ def create_routes():
             cert_content = f.read()
         with open(KEY_FILE, "r") as f:
             key_content = f.read()
+            
+        # Read Client Certs for Backend mTLS
+        with open(CERT_FILE_CLIENT, "r") as f:
+            client_cert_content = f.read()
+        with open(KEY_FILE_CLIENT, "r") as f:
+            client_key_content = f.read()
+            
     except FileNotFoundError as e:
         print(f"Error reading certs: {e}")
         return
@@ -70,15 +79,22 @@ def create_routes():
             "plugins": {
                 **common_plugins,
                 "proxy-rewrite": {
-                    "regex_uri": ["^/api/v1/crm/(.*)", "/$1"]
+                    "regex_uri": ["^/api/v1/crm/(.*)", "/$1"],
+                    "headers": {
+                        "X-Client-Cert-Fingerprint": "$ssl_client_fingerprint"
+                    }
                 }
             },
             "upstream": {
                 "nodes": {
-                    "crm-app:8004": 1
+                    "crm-app:8443": 1
                 },
                 "type": "roundrobin",
-                "scheme": "http"
+                "scheme": "https",
+                "tls": {
+                    "client_cert": client_cert_content,
+                    "client_key": client_key_content
+                }
             }
         },
         {
@@ -92,7 +108,10 @@ def create_routes():
             "plugins": {
                 **common_plugins,
                 "proxy-rewrite": {
-                    "regex_uri": ["^/api/v1/crm/(.*)", "/$1"]
+                    "regex_uri": ["^/api/v1/crm/(.*)", "/$1"],
+                    "headers": {
+                        "X-Client-Cert-Fingerprint": "$ssl_client_fingerprint"
+                    }
                 },
                 "authz-keycloak": {
                     "token_endpoint": "http://keycloak:8080/realms/zero-trust/protocol/openid-connect/token",
@@ -104,10 +123,14 @@ def create_routes():
             },
             "upstream": {
                 "nodes": {
-                    "crm-app:8004": 1
+                    "crm-app:8443": 1
                 },
                 "type": "roundrobin",
-                "scheme": "http"
+                "scheme": "https",
+                "tls": {
+                    "client_cert": client_cert_content,
+                    "client_key": client_key_content
+                }
             }
         },
         {
@@ -122,7 +145,10 @@ def create_routes():
                     "allow_headers": "*"
                 },
                 "proxy-rewrite": {
-                    "regex_uri": ["^/api/v1/auth/(.*)", "/$1"]
+                    "regex_uri": ["^/api/v1/auth/(.*)", "/$1"],
+                    "headers": {
+                        "X-Client-Cert-Fingerprint": "$ssl_client_fingerprint"
+                    }
                 }
             },
             "upstream": {

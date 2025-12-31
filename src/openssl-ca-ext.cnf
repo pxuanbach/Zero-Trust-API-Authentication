@@ -1,4 +1,0 @@
-basicConstraints = CA:FALSE
-keyUsage = critical, digitalSignature, keyEncipherment
-extendedKeyUsage = clientAuth
-subjectAltName = DNS:service-a
