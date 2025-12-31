@@ -364,9 +364,9 @@ Phần đánh giá sẽ tập trung vào ba câu hỏi nghiên cứu chính:
    ```
 
 **Kỳ vọng kết quả:**
-- Giảm 95%+ khả năng đánh cắp token thành công
+- Giảm 90%+ khả năng đánh cắp token thành công
 - Loại bỏ hoàn toàn tấn công phát lại với bằng chứng DPoP mới
-- Tăng yêu cầu nỗ lực cho kẻ tấn công từ 1x lên 100x+
+- Tăng yêu cầu nỗ lực cho kẻ tấn công từ 1x lên 10x+
 
 #### **RQ2: Đánh giá tác động hiệu suất**
 
@@ -398,26 +398,22 @@ Phần đánh giá sẽ tập trung vào ba câu hỏi nghiên cứu chính:
    ├── Thời gian xác thực chứng chỉ
    ├── Thời gian xác minh token
    ├── Thời gian xác thực bằng chứng DPoP
-   ├── Thời gian kiểm tra ràng buộc chứng chỉ-token
    └── Độ trễ yêu cầu đầu cuối
    
    Đo lường thông lượng:
    ├── Yêu cầu mỗi giây (RPS)
    ├── Khả năng kết nối đồng thời
-   ├── Tỷ lệ lỗi dưới tải
    └── Sử dụng tài nguyên (CPU, Bộ nhớ, Mạng)
    ```
 
 3. **Optimization Testing:**
    ```
    Chiến lược tối ưu hóa:
-   ├── Bộ nhớ đệm xác thực chứng chỉ (quan trọng cho hiệu suất)
-   ├── Khôi phục phiên TLS (giảm chi phí phụ bắt tay)
+   ├── Bộ nhớ đệm xác thực chứng chỉ
    ├── Bộ nhớ đệm kết quả xác minh token (dựa trên Redis)
    ├── Lựa chọn thuật toán (Ed25519 được ưu tiên cho hiệu quả tài nguyên)
    ├── Gom nhóm requests (giảm chi phí phụ mỗi yêu cầu)
    ├── Quản lý bộ nhớ (điều chỉnh thu gom rác)
-   └── Tối ưu hóa quy trình (đơn luồng so với đa luồng)
    
    Resource Constraints Considerations:
    ├── Memory: Giới hạn số kết nối đồng thời.
@@ -428,9 +424,9 @@ Phần đánh giá sẽ tập trung vào ba câu hỏi nghiên cứu chính:
 
 **Kỳ vọng kết quả:**
 - Base overhead: 40-60ms per request
-- Optimized overhead: 15-25ms per request (với caching)
-- Throughput: 200-500 RPS (t3a.small), 100-200 RPS (t3a.micro)
-- Resource utilization: CPU 60-80%, Memory 70-90% under moderate load
+- Tối ưu vận hành: giảm độ trễ xuống 20% (với caching).
+- Throughput: 200-300 RPS (t3a.small), 100-200 RPS (t3a.micro)
+- Resource utilization: CPU 60-80%, Memory 50-80% under moderate load
 
 #### **RQ3: Đánh giá chiến lược hoạt động**
 
@@ -446,7 +442,6 @@ Phần đánh giá sẽ tập trung vào ba câu hỏi nghiên cứu chính:
    
    Tiêu chí đánh giá:
    ├── Độ phức tạp thiết lập (thang điểm 1-10)
-   ├── Chi phí phụ vận hành (giờ người/tháng)
    ├── Phân tích chi phí ($/tháng)
    ├── Khả năng tự động hóa
    └── Sẵn sàng khôi phục thảm họa
@@ -459,24 +454,20 @@ Phần đánh giá sẽ tập trung vào ba câu hỏi nghiên cứu chính:
    ├── Quy trình xoay vòng (chu kỳ 30, 60, 90 ngày)
    ├── Thu hồi khẩn cấp
    ├── Quản lý chứng chỉ hàng loạt
-   ├── Đồng bộ chứng chỉ liên môi trường
-   └── Báo cáo tuân thủ
    ```
 
 3. **Đánh giá tự động hóa:**
    ```
    Mức độ tự động hóa:
-   ├── Tự động hoàn toàn (giao thức **ACME**)
-   ├── Bán tự động (**Terraform** + quy trình phê duyệt)
+   ├── Tự động hoàn toàn (giao thức ACME)
+   ├── Bán tự động (Terraform + quy trình phê duyệt)
    ├── Thủ công với công cụ hỗ trợ 
    └── Quy trình hoàn toàn thủ công
    
    Tiêu chí đánh giá:
-   ├── Thời gian trung bình cấp phát chứng chỉ (**MTTCI**)
+   ├── Thời gian trung bình cấp phát chứng chỉ (MTTCI)
    ├── Sự cố hết hạn chứng chỉ
-   ├── Tỷ lệ thành công xoay vòng
    ├── Chi phí vận hành mỗi chứng chỉ
-   └── Tương quan sự cố bảo mật
    ```
 
 **Kỳ vọng kết quả:**

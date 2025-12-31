@@ -1,0 +1,7 @@
+services:
+  cert-rotator:
+    build: ./cert-rotator
+    volumes:
+      - ./certs:/certs:rw
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: "no"

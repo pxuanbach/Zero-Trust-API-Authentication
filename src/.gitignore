@@ -1,0 +1,23 @@
+# Service A
+service-a/__pycache__/
+service-b/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+.Python
+*.log
+
+# Docker
+.dockerignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db

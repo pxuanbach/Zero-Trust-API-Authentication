@@ -1,0 +1,73 @@
+services:
+  extension-app1:
+    image: pxuanbach/zt:extension-app1
+    build:
+      context: ./services
+      dockerfile: extension-app1/Dockerfile
+    container_name: extension-app1
+    environment:
+      SERVICE_NAME: extension-app1
+      APISIX_URL: https://apisix:9443
+      GATEWAY_DOMAIN: apisix
+      CA_FINGERPRINT: 38130238b5726261bdbf649fa2da4b4f26a33d07eba868ab7f7ba1b1da419af8
+      CERT_DIR: /app/certs
+      SERVER_CERT: /app/certs/extension-app1/extension-app1.crt
+      SERVER_KEY: /app/certs/extension-app1/extension-app1.key
+      CA_CERT: /app/certs/ca/ca.crt
+      STEPDEBUG: 1
+    ports:
+      - "8003:8000"
+      - "8403:8443" # HTTPS port
+    networks:
+      - public-network
+    extra_hosts:
+      - "apisix:13.228.58.61"
+    healthcheck:
+      test: ["CMD", "curl", "-k", "-f", "https://localhost:8443/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: always
+
+  extension-app2:
+    build:
+      context: ./services
+      dockerfile: extension-app1/Dockerfile
+    container_name: extension-app2
+    environment:
+      SERVICE_NAME: extension-app2
+      APISIX_URL: https://52.220.127.158:9443
+      GATEWAY_DOMAIN: apisix
+      USE_MTLS: "false"
+      VERIFY_SERVER: "false" # Since we don't have CA cert
+    ports:
+      - "8005:8000"
+      - "8405:8443"
+    networks:
+      - public-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: always
+
+  crm-app:
+    image: pxuanbach/zt:crm-app
+    build:
+      context: ./services
+      dockerfile: crm-app/Dockerfile
+    container_name: crm-app
+    environment:
+      SERVICE_NAME: crm-app
+    ports:
+      - "8004:8001"
+      - "8404:8443" # HTTPS port
+    networks:
+      - aaa-network
+    healthcheck:
+      test: ["CMD", "curl", "-k", "-f", "https://localhost:8443/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: always

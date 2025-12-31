@@ -1,0 +1,7 @@
+include:
+  - ./src/dbs.yml
+  - ./src/keycloak.yml
+  - ./src/step-ca.yml
+  - ./src/services.yml
+  - ./src/apisix.yml
+  # - ./src/rotator.yml

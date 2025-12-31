@@ -1,0 +1,57 @@
+apisix:
+  node_listen: 9080
+  enable_ipv6: false
+  ssl:
+    fallback_sni: "apisix"
+
+  enable_control: true
+  control:
+    ip: "0.0.0.0"
+    port: 9092
+
+deployment:
+  role: traditional
+  role_traditional:
+    config_provider: etcd
+  etcd:
+    host:
+      - "http://etcd:2379"
+    prefix: "/apisix"
+    timeout: 30
+
+  admin:
+    admin_key:
+      - name: "admin"
+        key: edd1c9f034335f136f87ad84b625c8f1
+        role: admin
+    enable_admin_cors: true
+    allow_admin:
+      - 0.0.0.0/0
+
+nginx_config:
+  error_log: "/dev/stderr"
+  error_log_level: "warn"
+  http:
+    access_log: "/usr/local/apisix/logs/access.log"
+    access_log_format: '$remote_addr - $remote_user [$time_local] "$request" $status $body_bytes_sent "$http_referer" "$http_user_agent" $request_time $upstream_response_time "$http_authorization"'
+
+plugin_attr:
+  prometheus:
+    export_addr:
+      ip: "0.0.0.0"
+      port: 9091
+
+plugins:
+  - cors
+  - openid-connect # Integrate AAA Server (Keycloak)
+  - authz-keycloak # Keycloak Authorization
+  - limit-req # Rate Limiting
+  - limit-count # Rate Limiting
+  - request-id
+  - http-logger
+  - prometheus # Monitoring
+  - proxy-rewrite # Routing
+  - response-rewrite # Response modification
+  - fault-injection
+  - ip-restriction
+  - server-info # Dashboard info

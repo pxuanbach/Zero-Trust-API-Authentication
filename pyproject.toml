@@ -1,7 +1,28 @@
 [project]
 name = "zero-trust-api-authentication"
 version = "0.1.0"
-description = "Add your description here"
+description = "Zero Trust API Authentication with mTLS and Token-Based Signatures"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "boto3>=1.40.56",
+    "cryptography>=46.0.3",
+    "fastapi>=0.119.1",
+    "httpx>=0.28.1",
+    "pydantic>=2.12.3",
+    "pydantic-settings>=2.11.0",
+    "pyjwt>=2.10.1",
+    "python-multipart>=0.0.20",
+    "redis>=6.4.0",
+    "requests>=2.32.5",
+    "uvicorn[standard]>=0.38.0",
+]
+
+[dependency-groups]
+dev = [
+    "black>=25.9.0",
+    "flake8>=7.3.0",
+    "isort>=7.0.0",
+    "pytest>=8.4.2",
+    "pytest-asyncio>=1.2.0",
+]

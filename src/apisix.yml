@@ -1,0 +1,50 @@
+services:
+  #region API Gateway
+  apisix:
+    image: ${GW_IMAGE:-apache/apisix:3.7.0-debian}
+    container_name: apisix-gateway
+    restart: on-failure
+    volumes:
+      - ./apisix/config.yaml:/usr/local/apisix/conf/config.yaml:ro
+      - ./certs:/usr/local/apisix/conf/ssl/step-ca:ro
+    ports:
+      - "9080:9080" # Gateway HTTP
+      - "9443:9443" # Gateway HTTPS
+      - "9180:9180" # Admin API
+    depends_on:
+      etcd:
+        condition: service_healthy
+    networks:
+      aaa-network:
+      public-network:
+        aliases:
+          - apisix
+
+  apisix-dashboard:
+    image: apache/apisix-dashboard:3.0.0-alpine
+    container_name: apisix-dashboard
+    restart: on-failure
+    volumes:
+      - ./apisix/dashboard-conf.yaml:/usr/local/apisix-dashboard/conf/conf.yaml:ro
+    ports:
+      - "9000:9000"
+    depends_on:
+      apisix:
+        condition: service_started
+    networks:
+      - aaa-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9000"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  #endregion
+
+networks:
+  aaa-network:
+    driver: bridge
+  public-network:
+    driver: bridge
+
+volumes:
+  etcd_data:

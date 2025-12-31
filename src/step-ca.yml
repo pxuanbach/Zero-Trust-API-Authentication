@@ -1,0 +1,20 @@
+services:
+  #region Certificate Authority
+  step-ca:
+    image: smallstep/step-ca:latest
+    container_name: step-ca
+    environment:
+      DOCKER_STEPCA_INIT_NAME: "Zero Trust Internal CA"
+      DOCKER_STEPCA_INIT_DNS_NAMES: "localhost,step-ca,apisix"
+      DOCKER_STEPCA_INIT_PASSWORD: "secure-ca-password"
+      DOCKER_STEPCA_INIT_PROVISIONER_NAME: "admin@zerotrust.local"
+    ports:
+      - "9001:9000"
+    volumes:
+      - step_ca_data:/home/step
+    networks:
+      - aaa-network
+    restart: always
+
+volumes:
+  step_ca_data:

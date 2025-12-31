@@ -1,0 +1,203 @@
+import uvicorn
+from fastapi import FastAPI, Header, Request, HTTPException
+from typing import Optional
+import httpx
+import os
+import json
+import base64
+import ssl
+
+app = FastAPI(title="Extension App 1")
+
+SERVICE_NAME = os.getenv("SERVICE_NAME", "extension-app1")
+APISIX_URL = os.getenv("APISIX_URL", "https://apisix:9443")
+
+
+# Paths to certificates
+SERVER_CERT = os.getenv("SERVER_CERT", f"/app/certs/{SERVICE_NAME}/{SERVICE_NAME}.crt")
+SERVER_KEY = os.getenv("SERVER_KEY", f"/app/certs/{SERVICE_NAME}/{SERVICE_NAME}.key")
+CA_CERT = os.getenv("CA_CERT", "/app/certs/ca/ca.crt")
+USE_MTLS = os.getenv("USE_MTLS", "true").lower() == "true"
+
+
+@app.get("/")
+async def root():
+    return {
+        "service": SERVICE_NAME,
+        "message": "Hello from Extension App 1",
+        "status": "running",
+        "mtls_enabled": USE_MTLS
+    }
+
+
+@app.get("/health")
+async def health():
+    """Health check endpoint"""
+    return {"status": "healthy", "service": SERVICE_NAME}
+
+
+@app.get("/call-crm")
+async def call_crm(
+    request: Request,
+    authorization: Optional[str] = Header(None),
+):
+    """
+    Endpoint to call APISIX Gateway using mTLS.
+    """
+    headers = {"X-Source-Service": SERVICE_NAME}
+    if authorization:
+        headers["Authorization"] = authorization
+    else:
+        raise HTTPException(status_code=401, detail="Authorization header is required")
+
+    try:
+        if USE_MTLS:
+            # Create SSL context with fresh cert files
+            ssl_context = ssl.create_default_context(cafile=CA_CERT)
+            ssl_context.load_cert_chain(certfile=SERVER_CERT, keyfile=SERVER_KEY)
+            verify_param = ssl_context
+        else:
+            verify_param = False
+
+        async with httpx.AsyncClient(
+            verify=verify_param,
+            timeout=30.0
+        ) as client:
+            response = await client.get(
+                f"{APISIX_URL}/api/v1/crm/data",
+                headers=headers
+            )
+            
+            if response.status_code != 200:
+                raise HTTPException(
+                    status_code=response.status_code,
+                    detail=f"CRM App returned error: {response.text}"
+                )
+                
+            return {
+                "message": "Successfully called CRM App",
+                "crm_response": response.json()
+            }
+            
+    except httpx.RequestError as e:
+        raise HTTPException(status_code=503, detail=f"Failed to connect to CRM App: {str(e)}")
+    except ssl.SSLError as e:
+        raise HTTPException(status_code=403, detail=f"mTLS Handshake Failed: {str(e)}")
+
+
+@app.delete("/call-delete-crm-resource/{resource_id}")
+async def call_delete_crm_resource(
+    request: Request,
+    resource_id: int,
+    authorization: Optional[str] = Header(None),
+):
+    """
+    Endpoint to call APISIX Gateway using mTLS.
+    """
+    headers = {"X-Source-Service": SERVICE_NAME}
+    if authorization:
+        headers["Authorization"] = authorization
+    else:
+        raise HTTPException(status_code=401, detail="Authorization header is required")
+
+    try:
+        if USE_MTLS:
+            # Create SSL context with fresh cert files
+            ssl_context = ssl.create_default_context(cafile=CA_CERT)
+            ssl_context.load_cert_chain(certfile=SERVER_CERT, keyfile=SERVER_KEY)
+            verify_param = ssl_context
+        else:
+            verify_param = False
+
+        async with httpx.AsyncClient(
+            verify=verify_param,
+            timeout=30.0
+        ) as client:
+            response = await client.delete(
+                f"{APISIX_URL}/api/v1/crm/data/{resource_id}",
+                headers=headers
+            )
+            
+            if response.status_code != 200:
+                raise HTTPException(
+                    status_code=response.status_code,
+                    detail=f"CRM App returned error: {response.text}"
+                )
+                
+            return {
+                "message": "Successfully called CRM App",
+                "crm_response": response.json()
+            }
+            
+    except httpx.RequestError as e:
+        raise HTTPException(status_code=503, detail=f"Failed to connect to CRM App: {str(e)}")
+    except ssl.SSLError as e:
+        raise HTTPException(status_code=403, detail=f"mTLS Handshake Failed: {str(e)}")
+
+
+from pydantic import BaseModel
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+@app.post("/login")
+async def login(creds: LoginRequest):
+    """
+    Endpoint to get Access Token from Keycloak via APISIX.
+    """
+    token_url = f"{APISIX_URL}/api/v1/auth/realms/zero-trust/protocol/openid-connect/token"
+    
+    # x-www-form-urlencoded data
+    data = {
+        "client_id": "test-client",
+        "client_secret": "test-client-secret",
+        "username": creds.username,
+        "password": creds.password,
+        "grant_type": "password"
+    }
+    
+    try:
+        # Determine SSL context based on configuration
+        if USE_MTLS:
+            # Create SSL context with fresh cert files
+            ssl_context = ssl.create_default_context(cafile=CA_CERT)
+            ssl_context.load_cert_chain(certfile=SERVER_CERT, keyfile=SERVER_KEY)
+            verify_param = ssl_context
+        else:
+            # Disable verification if mTLS is not used
+            verify_param = False
+
+        async with httpx.AsyncClient(verify=verify_param) as client:
+            response = await client.post(token_url, data=data)
+            
+            if response.status_code != 200:
+                 raise HTTPException(
+                    status_code=response.status_code,
+                    detail=f"Login failed: {response.text}"
+                )
+            
+            return response.json()
+    except httpx.RequestError as e:
+         raise HTTPException(status_code=503, detail=f"Failed to connect to Auth Service: {str(e)}")
+    except ssl.SSLError as e:
+        raise HTTPException(status_code=403, detail=f"SSL Handshake Failed: {str(e)}")
+
+@app.delete("/resource/{resource_id}")
+async def delete_resource(resource_id: int):
+    """
+    Endpoint to simulate resource deletion.
+    Only accessible by Admin (enforced by Gateway).
+    """
+    return {
+        "message": f"Resource {resource_id} deleted successfully",
+        "status": "deleted"
+    }
+
+if __name__ == "__main__":
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=False
+    )
